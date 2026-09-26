@@ -1,0 +1,352 @@
+// ─── Schéma Prisma — DJASSA Marketplace ─────────────────────────────────────
+// Règles : montants en entiers (XOF), suppression logique (deletedAt),
+//          seller_id sur toutes les tables propriétaires.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Utilisateurs ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  phone        String?  @unique
+  passwordHash String
+  role         UserRole @default(BUYER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  seller  Seller?
+  orders  Order[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+// ─── Vendeurs ─────────────────────────────────────────────────────────────────
+
+model Seller {
+  id             String       @id @default(cuid())
+  userId         String       @unique
+  shopName       String       @unique
+  description    String?
+  city           String?
+  address        String?
+  logoUrl        String?
+  commissionRate Int          @default(500)  // en centièmes de % : 500 = 5,00 %
+  status         SellerStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  user        User          @relation(fields: [userId], references: [id])
+  products    Product[]
+  locations   Location[]
+  sellerOrders SellerOrder[]
+  payouts     Payout[]
+  auditLogs   AuditLog[]
+
+  @@index([status])
+  @@map("sellers")
+}
+
+enum SellerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+// ─── Catalogue ────────────────────────────────────────────────────────────────
+
+model Category {
+  id       String     @id @default(cuid())
+  parentId String?
+  name     String
+  slug     String     @unique
+  parent   Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children Category[] @relation("Subcategories")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  sellerId    String
+  categoryId  String?
+  title       String
+  description String?
+  status      ProductStatus @default(DRAFT)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  seller    Seller         @relation(fields: [sellerId], references: [id])
+  category  Category?      @relation(fields: [categoryId], references: [id])
+  variants  ProductVariant[]
+
+  @@index([sellerId])
+  @@index([sellerId, status])
+  @@map("products")
+}
+
+enum ProductStatus {
+  DRAFT
+  ONLINE
+  MODERATION
+  ARCHIVED
+}
+
+model ProductVariant {
+  id             String   @id @default(cuid())
+  productId      String
+  sellerId       String
+  sku            String   @unique
+  attributes     Json     @default("{}")  // ex: { "couleur": "rouge", "taille": "M" }
+  price          Int      // en XOF (entier)
+  originalPrice  Int?
+  costPrice      Int      @default(0)
+  imageUrls      String[] @default([])
+  alertThreshold Int      @default(5)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product     Product      @relation(fields: [productId], references: [id])
+  stockLevels StockLevel[]
+  orderItems  OrderItem[]
+
+  @@index([sellerId])
+  @@map("product_variants")
+}
+
+// ─── Stock ────────────────────────────────────────────────────────────────────
+
+model Location {
+  id        String   @id @default(cuid())
+  sellerId  String
+  name      String
+  address   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  seller      Seller       @relation(fields: [sellerId], references: [id])
+  stockLevels StockLevel[]
+  movements   StockMovement[]
+
+  @@index([sellerId])
+  @@map("locations")
+}
+
+model StockLevel {
+  variantId    String
+  locationId   String
+  sellerId     String
+  qtyOnHand    Int @default(0)
+  qtyReserved  Int @default(0)
+  updatedAt    DateTime @updatedAt
+
+  variant  ProductVariant @relation(fields: [variantId], references: [id])
+  location Location       @relation(fields: [locationId], references: [id])
+
+  // qty_available = qtyOnHand - qtyReserved (calculé)
+  // Contraintes CHECK appliquées via migration SQL directe
+
+  @@id([variantId, locationId])
+  @@index([sellerId])
+  @@map("stock_levels")
+}
+
+model StockMovement {
+  id         String            @id @default(cuid())
+  variantId  String
+  locationId String
+  sellerId   String
+  type       StockMovementType
+  quantity   Int               // signé : + ou -
+  reason     String
+  sourceRef  String?           // orderId, inventoryId, etc.
+  authorId   String
+  createdAt  DateTime          @default(now())
+
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@index([sellerId])
+  @@index([variantId])
+  @@index([sellerId, createdAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  ENTREE        // réception marchandise
+  SORTIE        // perte, casse, usage interne
+  RESERVATION   // commande validée
+  LIBERATION    // annulation ou expiration
+  VENTE         // paiement confirmé
+  RETOUR        // retour client
+  AJUSTEMENT    // inventaire physique
+  TRANSFERT     // entre emplacements
+}
+
+// ─── Commandes ────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String      @id @default(cuid())
+  buyerId         String
+  idempotencyKey  String      @unique
+  status          OrderStatus @default(PENDING)
+  total           Int         // en XOF
+  deliveryFee     Int         @default(0)
+  buyerName       String
+  buyerPhone      String
+  buyerCity       String
+  buyerAddress    String
+  buyerNotes      String?
+  reservedUntil   DateTime?   // expiration de la réservation
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  buyer       User          @relation(fields: [buyerId], references: [id])
+  sellerOrders SellerOrder[]
+  payments    Payment[]
+
+  @@index([buyerId])
+  @@index([status])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  EXPIRED
+}
+
+model SellerOrder {
+  id         String            @id @default(cuid())
+  orderId    String
+  sellerId   String
+  subtotal   Int               // en XOF
+  commission Int               // en XOF (calculé : subtotal × commissionRate)
+  status     SellerOrderStatus @default(PENDING)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  order  Order       @relation(fields: [orderId], references: [id])
+  seller Seller      @relation(fields: [sellerId], references: [id])
+  items  OrderItem[]
+
+  @@index([sellerId])
+  @@index([orderId])
+  @@map("seller_orders")
+}
+
+enum SellerOrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model OrderItem {
+  id            String @id @default(cuid())
+  sellerOrderId String
+  variantId     String
+  quantity      Int
+  unitPrice     Int    // prix figé au moment de la commande
+
+  sellerOrder SellerOrder    @relation(fields: [sellerOrderId], references: [id])
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@map("order_items")
+}
+
+// ─── Paiements ────────────────────────────────────────────────────────────────
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  provider        String        // ex: "cinetpay", "fedapay", "cash_on_delivery"
+  externalRef     String?       @unique  // référence du fournisseur
+  providerEventId String?       @unique  // pour l'idempotence des webhooks
+  amount          Int           // en XOF
+  status          PaymentStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+// ─── Reversements ─────────────────────────────────────────────────────────────
+
+model Payout {
+  id        String       @id @default(cuid())
+  sellerId  String
+  amount    Int          // en XOF
+  period    String       // ex: "2026-09"
+  status    PayoutStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  seller Seller @relation(fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  sellerId  String?
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  seller Seller? @relation(fields: [sellerId], references: [id])
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

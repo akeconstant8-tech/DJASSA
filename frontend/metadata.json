@@ -1,0 +1,6 @@
+{
+  "name": "Djassa Market",
+  "description": "Marketplace e-commerce complète avec catalogue produits en XOF, parcours d'achat client et espace vendeur sécurisé pour la gestion des stocks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
