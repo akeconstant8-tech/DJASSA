@@ -24,12 +24,19 @@ export interface Product {
   color?: string;
   description: string;
   descriptionEn: string;
+  sellerId: string;
+  sellerName: string;
+  sellerShopName: string;
 }
+
+export type NewProductInput = Omit<Product, 'sellerId' | 'sellerName' | 'sellerShopName'>;
 
 export interface CartItem {
   product: Product;
   quantity: number;
 }
+
+export type PaymentMethod = 'orange_money' | 'wave' | 'mtn_momo' | 'card';
 
 export interface CustomerOrderInfo {
   fullName: string;
@@ -38,11 +45,11 @@ export interface CustomerOrderInfo {
   district: string;
   address: string;
   notes?: string;
-  paymentMethod: 'orange_money' | 'wave' | 'mtn_momo' | 'card';
+  paymentMethod: PaymentMethod;
 }
 
 export interface ConfirmedOrder {
-  id: string; // e.g. "CMD-9428"
+  id: string;
   date: string;
   customer: CustomerOrderInfo;
   items: CartItem[];
@@ -56,6 +63,7 @@ export interface ConfirmedOrder {
 
 export interface SellerProfile {
   isAuthenticated: boolean;
+  id: string;
   email: string;
   name: string;
   shopName: string;

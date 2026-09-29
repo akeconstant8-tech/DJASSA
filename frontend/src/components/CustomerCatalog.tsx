@@ -1,10 +1,79 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product, Language } from '../types';
-import { DJASSA_LOGO, translations } from '../data/mockData';
+import { translations } from '../data/mockData';
+import {
+  AnimatePresence,
+  m,
+  duration,
+  ease,
+  flyToCart,
+  stagger,
+  toast,
+  trackSpotlight,
+  type Variants
+} from '../motion';
+import { HomeHero, HOME_INTRO_DURATION } from './HomeHero';
+import { Button } from './Button';
+import { SmartImage } from './SmartImage';
+
+// Les sections du catalogue enchaînent sur la fin de l'intro du hero.
+const SECTION_DELAY = HOME_INTRO_DURATION - 0.15;
+const introTransition = { duration: duration.intro, ease: ease.emphasized };
+
+const sidebarVariants: Variants = {
+  hidden: { opacity: 0, x: -24 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      ...introTransition,
+      delay: SECTION_DELAY,
+      delayChildren: stagger(0.07, { startDelay: SECTION_DELAY + 0.1 })
+    }
+  }
+};
+
+const sectionItem: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: introTransition }
+};
+
+const controlsVariants: Variants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { ...introTransition, delay: SECTION_DELAY + 0.05 } }
+};
+
+// Révélation au défilement. Les éléments qui entrent ensemble dans le viewport (même frame)
+// sont décalés entre eux, quel que soit le nombre de colonnes. Au chargement, ils attendent la fin de l'intro.
+function createScrollReveal(mountedAt: number): Variants {
+  let lastTrigger = -Infinity;
+  let batchIndex = 0;
+  return {
+    hidden: { opacity: 0, y: 28, scale: 0.97 },
+    visible: () => {
+      const now = performance.now();
+      batchIndex = now - lastTrigger < 50 ? Math.min(batchIndex + 1, 6) : 0;
+      lastTrigger = now;
+      const wait = Math.max(0, HOME_INTRO_DURATION - (now - mountedAt) / 1000);
+      return {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: { ...introTransition, delay: wait + batchIndex * 0.08 }
+      };
+    }
+  };
+}
+
+// Marge haute quasi infinie : une carte que le navigateur n'a pas vue passer (défilement très rapide
+// sur un appareil chargé) compte comme déjà vue et se révèle — aucune carte ne reste invisible.
+// Par le bas, la carte se révèle toujours quand 20 % sont à l'écran.
+const revealViewport = { once: true, amount: 0.2, margin: '9999px 0px 0px 0px' };
 
 interface CustomerCatalogProps {
   products: Product[];
-  onAddToCart: (product: Product) => void;
+  // false : tout le stock disponible est déjà dans le panier.
+  onAddToCart: (product: Product) => boolean;
   lang: Language;
   globalSearch: string;
 }
@@ -21,17 +90,40 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [scrollReveal] = useState(() => createScrollReveal(performance.now()));
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   const t = translations[lang];
+
+  // Retour visuel sur le bouton lui-même après un ajout au panier (en plus du toast).
+  const renderAddToCartLabel = (productId: string, iconClass: string) =>
+    justAddedId === productId ? (
+      <span key="added" className="inline-flex items-center gap-2 animate-scale-in">
+        <span className={`material-symbols-outlined ${iconClass}`} aria-hidden="true">
+          check_circle
+        </span>
+        <span>{lang === 'FR' ? 'Ajouté' : 'Added'}</span>
+      </span>
+    ) : (
+      <span key="idle" className="inline-flex items-center gap-2 animate-fade-in">
+        <span className={`material-symbols-outlined ${iconClass}`} aria-hidden="true">
+          shopping_bag
+        </span>
+        <span>{t.addToCart}</span>
+      </span>
+    );
+
+  // Les produits masqués par leur vendeur ne comptent pas dans les catégories.
+  const visibleProducts = useMemo(() => products.filter((p) => p.visibility), [products]);
 
   // Category counts
   const categoriesList = useMemo(() => {
     const map = new Map<string, number>();
-    products.forEach((p) => {
+    visibleProducts.forEach((p) => {
       map.set(p.category, (map.get(p.category) || 0) + 1);
     });
     return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
-  }, [products]);
+  }, [visibleProducts]);
 
   // Filtering
   const filteredProducts = useMemo(() => {
@@ -54,7 +146,8 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
         const matchName = (p.name + ' ' + p.nameEn).toLowerCase().includes(q);
         const matchSku = p.sku.toLowerCase().includes(q);
         const matchCat = p.category.toLowerCase().includes(q);
-        if (!matchName && !matchSku && !matchCat) return false;
+        const matchShop = p.sellerShopName.toLowerCase().includes(q);
+        if (!matchName && !matchSku && !matchCat && !matchShop) return false;
       }
 
       return true;
@@ -76,14 +169,29 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
     return list;
   }, [filteredProducts, sortBy]);
 
-  const handleAddToCart = (product: Product) => {
-    onAddToCart(product);
-    setToastMessage(
-      lang === 'FR'
-        ? `${product.name} ajouté au panier !`
-        : `${product.nameEn} added to cart!`
-    );
-    setTimeout(() => setToastMessage(null), 3000);
+  // Un seul minuteur actif : un nouveau message n'est plus effacé par le minuteur du précédent.
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const showToast = (message: string) => {
+    clearTimeout(toastTimer.current);
+    setToastMessage(message);
+    toastTimer.current = setTimeout(() => setToastMessage(null), 3000);
+  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  const handleAddToCart = (product: Product, button?: HTMLElement) => {
+    const name = lang === 'FR' ? product.name : product.nameEn;
+    if (!onAddToCart(product)) {
+      showToast(
+        lang === 'FR'
+          ? `Stock maximum atteint pour ${name} (${product.stock} disponibles).`
+          : `Maximum stock reached for ${name} (${product.stock} available).`
+      );
+      return;
+    }
+    showToast(lang === 'FR' ? `${name} ajouté au panier !` : `${name} added to cart!`);
+    if (button) flyToCart(button, product.image);
+    setJustAddedId(product.id);
+    setTimeout(() => setJustAddedId((id) => (id === product.id ? null : id)), 1400);
   };
 
   const handleResetFilters = () => {
@@ -95,61 +203,39 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 bg-[#0f172a] text-white px-4 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 animate-in fade-in duration-200 border border-[#ea580c]">
-          <div className="w-7 h-7 rounded-full bg-gradient-orange text-white flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[16px]">check</span>
-          </div>
-          <span className="text-xs font-semibold">{toastMessage}</span>
-        </div>
-      )}
+      <AnimatePresence>
+        {toastMessage && (
+          <m.div
+            key={toastMessage}
+            variants={toast}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            role="status"
+            className="fixed bottom-6 right-6 max-w-[calc(100vw-3rem)] bg-[#0f172a] text-white px-4 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 border border-[#ea580c]"
+          >
+            <div className="w-7 h-7 rounded-full bg-gradient-orange text-white flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[16px]">check</span>
+            </div>
+            <span className="text-xs font-semibold">{toastMessage}</span>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       {/* Hero Welcome Minimalist Banner with black gradient (dégradé noir) & official logo */}
-      <div className="mb-8 rounded-3xl p-6 sm:p-8 bg-gradient-dark text-white border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-[#ea580c]/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="max-w-xl relative z-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 text-[#f97316] text-xs font-extrabold shadow-xs mb-3 border border-zinc-700">
-            <span className="w-2 h-2 rounded-full bg-[#ea580c] animate-pulse" />
-            <span>Djassa Market • Marketplace UEMOA 100% XOF</span>
-          </span>
-          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            {t.catalogTitle}
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-300 mt-2 leading-relaxed">
-            {t.catalogSubtitle}
-          </p>
-          <div className="flex items-center gap-3 mt-4 text-xs font-semibold text-zinc-400">
-            <span className="flex items-center gap-1 text-[#f97316]">
-              <span className="material-symbols-outlined text-[16px]">verified</span>
-              Vendeurs Certifiés
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-white">
-              <span className="material-symbols-outlined text-[16px] text-[#f97316]">local_shipping</span>
-              Livraison 24h/48h
-            </span>
-          </div>
-        </div>
-
-        {/* Official Djassa Market 3D Logo Showcase */}
-        <div className="relative z-10 shrink-0 flex items-center justify-center">
-          <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-3xl bg-zinc-900/90 p-2 shadow-[0_10px_30px_rgba(234,88,12,0.25)] border-2 border-[#ea580c]/50 relative group">
-            <img
-              src={DJASSA_LOGO}
-              alt="Djassa Market Official Logo"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover rounded-2xl group-hover:scale-105 transition-transform duration-300"
-            />
-          </div>
-        </div>
-      </div>
+      <HomeHero title={t.catalogTitle} subtitle={t.catalogSubtitle} />
 
       {/* Main Grid: Filters + Products */}
       <div className="flex flex-col lg:flex-row items-start gap-8">
         {/* Left Filter Sidebar */}
-        <aside className="w-full lg:w-64 shrink-0 flex flex-col gap-5">
+        <m.aside
+          variants={sidebarVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full lg:w-64 shrink-0 flex flex-col gap-5"
+        >
           <div className="bg-white rounded-3xl p-5 shadow-xs border border-[#fed7aa]/60 flex flex-col gap-5">
-            <div className="flex items-center justify-between border-b border-[#fed7aa]/50 pb-3">
+            <m.div variants={sectionItem} className="flex items-center justify-between border-b border-[#fed7aa]/50 pb-3">
               <div className="flex items-center gap-2 font-bold text-sm text-[#0f172a]">
                 <span className="material-symbols-outlined text-[#ea580c] text-[20px]">
                   tune
@@ -162,31 +248,31 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
               >
                 {t.resetFilters}
               </button>
-            </div>
+            </m.div>
 
             {/* Categories */}
-            <div className="flex flex-col gap-2">
+            <m.div variants={sectionItem} className="flex flex-col gap-2">
               <span className="text-xs font-extrabold text-[#0f172a] uppercase tracking-wider">
                 {t.categories}
               </span>
               <div className="flex flex-col gap-1 text-xs">
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl item-motion ${
                     selectedCategory === 'all'
                       ? 'bg-[#fff7ed] text-[#ea580c] font-bold border border-[#fed7aa]'
                       : 'text-[#64748b] hover:bg-[#fffaf5]'
                   }`}
                 >
                   <span>{t.all}</span>
-                  <span className="text-[11px] text-[#94a3b8]">{products.length}</span>
+                  <span className="text-[11px] text-[#94a3b8]">{visibleProducts.length}</span>
                 </button>
 
                 {categoriesList.map((cat) => (
                   <button
                     key={cat.name}
                     onClick={() => setSelectedCategory(cat.name)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl item-motion ${
                       selectedCategory === cat.name
                         ? 'bg-[#fff7ed] text-[#ea580c] font-bold border border-[#fed7aa]'
                         : 'text-[#64748b] hover:bg-[#fffaf5]'
@@ -197,10 +283,10 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                   </button>
                 ))}
               </div>
-            </div>
+            </m.div>
 
             {/* Price Range Slider in XOF */}
-            <div className="flex flex-col gap-2 border-t border-[#fed7aa]/50 pt-4">
+            <m.div variants={sectionItem} className="flex flex-col gap-2 border-t border-[#fed7aa]/50 pt-4">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-extrabold text-[#0f172a] uppercase tracking-wider">
                   {t.priceRange}
@@ -222,10 +308,10 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                 <span>10 000 XOF</span>
                 <span>150 000 XOF</span>
               </div>
-            </div>
+            </m.div>
 
             {/* Stock status */}
-            <div className="flex flex-col gap-2 border-t border-[#fed7aa]/50 pt-4">
+            <m.div variants={sectionItem} className="flex flex-col gap-2 border-t border-[#fed7aa]/50 pt-4">
               <span className="text-xs font-extrabold text-[#0f172a] uppercase tracking-wider">
                 {t.stockStatus}
               </span>
@@ -261,14 +347,19 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                   <span>{t.lowStockOnly}</span>
                 </label>
               </div>
-            </div>
+            </m.div>
           </div>
-        </aside>
+        </m.aside>
 
         {/* Right Content Area: Products */}
         <div className="flex-1 w-full flex flex-col gap-5">
           {/* Controls Bar: Sort, Counts & Grid/List switcher */}
-          <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#fed7aa]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <m.div
+            variants={controlsVariants}
+            initial="hidden"
+            animate="visible"
+            className="bg-white rounded-2xl p-4 shadow-xs border border-[#fed7aa]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          >
             <span className="text-xs font-bold text-[#64748b]">
               <strong className="text-[#0f172a] font-extrabold">{sortedProducts.length}</strong>{' '}
               {lang === 'FR' ? 'articles disponibles' : 'items available'}
@@ -293,8 +384,11 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
               {/* Grid / List Switcher */}
               <div className="flex items-center bg-[#fffaf5] p-1 rounded-xl border border-[#fed7aa]">
                 <button
+                  type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                  aria-pressed={viewMode === 'grid'}
+                  aria-label={t.viewGrid}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center item-motion ${
                     viewMode === 'grid'
                       ? 'bg-gradient-orange text-white shadow-xs'
                       : 'text-[#64748b] hover:text-[#0f172a]'
@@ -304,8 +398,11 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                   <span className="material-symbols-outlined text-[18px]">grid_view</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('list')}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                  aria-pressed={viewMode === 'list'}
+                  aria-label={t.viewList}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center item-motion ${
                     viewMode === 'list'
                       ? 'bg-gradient-orange text-white shadow-xs'
                       : 'text-[#64748b] hover:text-[#0f172a]'
@@ -316,27 +413,35 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                 </button>
               </div>
             </div>
-          </div>
+          </m.div>
 
           {/* Products Display: Grid or List Mode */}
           {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div key="grid" onPointerMove={trackSpotlight} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedProducts.map((product) => {
                 const isLowStock = product.stock > 0 && product.stock < 10;
                 const isOutOfStock = product.stock <= 0;
 
                 return (
-                  <div
+                  // Deux niveaux : l'extérieur gère la révélation au scroll (motion, style inline),
+                  // l'intérieur l'élévation au survol (CSS card-motion), qui serait sinon écrasée.
+                  <m.div
                     key={product.id}
-                    className="group bg-white rounded-3xl p-4 shadow-xs hover:shadow-xl border border-[#fed7aa]/60 hover:border-[#ea580c]/50 transition-all flex flex-col justify-between"
+                    variants={scrollReveal}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={revealViewport}
+                    className="h-full"
                   >
+                  <div className="card-motion card-spotlight group h-full bg-white rounded-3xl p-4 shadow-xs border border-[#fed7aa]/60 hover:border-[#ea580c]/50 flex flex-col justify-between">
                     <div>
                       {/* Product Image Frame */}
                       <div className="relative w-full h-52 bg-gradient-orange-subtle rounded-2xl flex items-center justify-center p-4 overflow-hidden border border-[#fed7aa]/30">
-                        <img
+                        <SmartImage
                           src={product.image}
                           alt={lang === 'FR' ? product.name : product.nameEn}
-                          className="object-contain h-full w-full group-hover:scale-105 transition-transform duration-300"
+                          wrapperClassName="h-full w-full rounded-xl"
+                          className="object-contain h-full w-full motion-safe:group-hover:scale-105"
                         />
                         {/* Stock status badge */}
                         <div className="absolute top-3 left-3">
@@ -346,7 +451,7 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                             </span>
                           ) : isLowStock ? (
                             <span className="px-2.5 py-0.5 rounded-full bg-[#ffedd5] text-[#c2410c] text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c] animate-pulse" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#ea580c]" />
                               {product.stock} {t.units} restants
                             </span>
                           ) : (
@@ -367,6 +472,14 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                         <h3 className="text-sm font-bold text-[#0f172a] group-hover:text-[#ea580c] transition-colors line-clamp-1">
                           {lang === 'FR' ? product.name : product.nameEn}
                         </h3>
+
+                        <span className="inline-flex items-center gap-1 text-[11px] text-[#64748b]">
+                          <span className="material-symbols-outlined text-[14px] text-[#ea580c]" aria-hidden="true">
+                            storefront
+                          </span>
+                          {t.soldBy}{' '}
+                          <strong className="font-bold text-[#0f172a]">{product.sellerShopName}</strong>
+                        </span>
 
                         {/* Rating */}
                         <div className="flex items-center gap-1 text-[11px] text-[#f59e0b]">
@@ -394,39 +507,43 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                     </div>
 
                     {/* Add to Cart CTA Button */}
-                    <button
+                    <Button
+                      type="button"
                       disabled={isOutOfStock}
-                      onClick={() => handleAddToCart(product)}
-                      className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                      onClick={(e) => handleAddToCart(product, e.currentTarget)}
+                      className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-orange text-white text-xs font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                     >
-                      <span className="material-symbols-outlined text-[18px]">
-                        shopping_bag
-                      </span>
-                      <span>{t.addToCart}</span>
-                    </button>
+                      {renderAddToCartLabel(product.id, 'text-[18px]')}
+                    </Button>
                   </div>
+                  </m.div>
                 );
               })}
             </div>
           ) : (
             /* List View Mode (like Image 2 & requested by user) */
             <div className="bg-white rounded-3xl shadow-xs border border-[#fed7aa]/60 overflow-hidden">
-              <div className="divide-y divide-[#fed7aa]/40">
+              <div key="list" className="divide-y divide-[#fed7aa]/40">
                 {sortedProducts.map((product) => {
                   const isLowStock = product.stock > 0 && product.stock < 10;
                   const isOutOfStock = product.stock <= 0;
 
                   return (
-                    <div
+                    <m.div
                       key={product.id}
-                      className="p-4 sm:p-5 hover:bg-[#fffaf5] transition-colors flex flex-col sm:flex-row items-center justify-between gap-4"
+                      variants={scrollReveal}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={revealViewport}
+                      className="group p-4 sm:p-5 hover:bg-[#fffaf5] transition-colors flex flex-col sm:flex-row items-center justify-between gap-4"
                     >
                       <div className="flex items-center gap-4 w-full sm:w-auto">
                         <div className="w-20 h-20 bg-gradient-orange-subtle rounded-2xl p-2 shrink-0 border border-[#fed7aa]/30 flex items-center justify-center">
-                          <img
+                          <SmartImage
                             src={product.image}
                             alt={product.name}
-                            className="w-full h-full object-contain"
+                            wrapperClassName="h-full w-full rounded-xl"
+                            className="w-full h-full object-contain motion-safe:group-hover:scale-105"
                           />
                         </div>
 
@@ -439,6 +556,13 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                           <h4 className="text-sm font-bold text-[#0f172a] truncate">
                             {lang === 'FR' ? product.name : product.nameEn}
                           </h4>
+                          <span className="inline-flex items-center gap-1 text-[11px] text-[#64748b]">
+                            <span className="material-symbols-outlined text-[14px] text-[#ea580c]" aria-hidden="true">
+                              storefront
+                            </span>
+                            {t.soldBy}{' '}
+                            <strong className="font-bold text-[#0f172a]">{product.sellerShopName}</strong>
+                          </span>
                           <p className="text-xs text-[#64748b] line-clamp-1">
                             {lang === 'FR' ? product.description : product.descriptionEn}
                           </p>
@@ -464,18 +588,16 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({
                       </div>
 
                       <div className="w-full sm:w-auto flex items-center justify-end">
-                        <button
+                        <Button
+                          type="button"
                           disabled={isOutOfStock}
-                          onClick={() => handleAddToCart(product)}
-                          className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                          onClick={(e) => handleAddToCart(product, e.currentTarget)}
+                          className="w-full sm:w-auto sm:min-w-42 px-5 py-2.5 rounded-2xl bg-gradient-orange text-white text-xs font-bold shadow-xs flex items-center justify-center gap-2"
                         >
-                          <span className="material-symbols-outlined text-[17px]">
-                            shopping_bag
-                          </span>
-                          <span>{t.addToCart}</span>
-                        </button>
+                          {renderAddToCartLabel(product.id, 'text-[17px]')}
+                        </Button>
                       </div>
-                    </div>
+                    </m.div>
                   );
                 })}
               </div>

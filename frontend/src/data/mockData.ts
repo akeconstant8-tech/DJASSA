@@ -1,17 +1,48 @@
-import djassaLogo from '../assets/images/djassa_market_logo_1790431985465.jpg';
+// WebP 512px (26 Ko) ré-encodé depuis l'original 1024px (596 Ko), conservé dans le même dossier.
+import djassaLogo from '../assets/images/djassa_market_logo_512.webp';
 import { Product, SellerProfile } from '../types';
 
 export const DJASSA_LOGO = djassaLogo;
 
 export const defaultSellerProfile: SellerProfile = {
   isAuthenticated: false,
-  email: 'amara.toure@djassa.ci',
-  name: 'Amara Touré',
-  shopName: 'TechHub Abidjan',
-  role: 'Vendeur Certifié'
+  id: '',
+  email: '',
+  name: '',
+  shopName: '',
+  role: ''
+};
+
+// Comptes vendeurs connus (mock — à remplacer par JWT réel)
+export const SELLER_ACCOUNTS: Record<string, SellerProfile> = {
+  'amara.toure@djassa.ci': {
+    isAuthenticated: true,
+    id: 'seller1',
+    email: 'amara.toure@djassa.ci',
+    name: 'Amara Touré',
+    shopName: 'TechHub Abidjan',
+    role: 'Vendeur Certifié Djassa Market'
+  },
+  'fatou.diallo@djassa.ci': {
+    isAuthenticated: true,
+    id: 'seller2',
+    email: 'fatou.diallo@djassa.ci',
+    name: 'Fatou Diallo',
+    shopName: 'Wax & Style CI',
+    role: 'Vendeur Certifié Djassa Market'
+  },
+  'kofi.mensah@djassa.sn': {
+    isAuthenticated: true,
+    id: 'seller3',
+    email: 'kofi.mensah@djassa.sn',
+    name: 'Kofi Mensah',
+    shopName: 'Nature & Bio Market',
+    role: 'Vendeur Certifié Djassa Market'
+  }
 };
 
 export const initialProducts: Product[] = [
+  // ── SELLER 1 : TechHub Abidjan ──────────────────────────────────────────
   {
     id: 'p1',
     sku: 'EL-KEY-0941',
@@ -22,8 +53,7 @@ export const initialProducts: Product[] = [
     price: 65000,
     originalPrice: 72000,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBDS5iiXGMUjbKnOxSDp5eMwoYunxaRrXjiU_I8HyNZeRhlmoRxEd9E6cuB-NBJ6UPy1jMnxVc9pKUbR_qmxkgjh0cRyeycSPtlJhC22KCLIu3yyhDyDOfR38tobCXANY9WqrPRxGcSOo_b-D9HVrstTFt4wSm-M-wFwOTtqIE9rM4-PQpRcO-n_No3zm2pTMPh43jR-MrdUsArx9b3bmHuXLks2Okon-NRqcFhgHbEzvyqcWpXES0j',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBDS5iiXGMUjbKnOxSDp5eMwoYunxaRrXjiU_I8HyNZeRhlmoRxEd9E6cuB-NBJ6UPy1jMnxVc9pKUbR_qmxkgjh0cRyeycSPtlJhC22KCLIu3yyhDyDOfR38tobCXANY9WqrPRxGcSOo_b-D9HVrstTFt4wSm-M-wFwOTtqIE9rM4-PQpRcO-n_No3zm2pTMPh43jR-MrdUsArx9b3bmHuXLks2Okon-NRqcFhgHbEzvyqcWpXES0j',
     rating: 4.9,
     reviewsCount: 128,
     stock: 42,
@@ -31,10 +61,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Teal & Gris',
-    description:
-      'Clavier mécanique sans fil compact 75% avec switchs tactiles pré-lubrifiés, rétroéclairage RGB personnalisable et compatibilité Mac/Windows.',
-    descriptionEn:
-      'High-end mechanical wireless keyboard 75% with pre-lubed tactile switches, custom RGB backlighting and dual Mac/Windows compatibility.'
+    description: 'Clavier mécanique sans fil compact 75% avec switchs tactiles pré-lubrifiés, rétroéclairage RGB personnalisable et compatibilité Mac/Windows.',
+    descriptionEn: 'High-end mechanical wireless keyboard 75% with pre-lubed tactile switches, custom RGB backlighting and dual Mac/Windows compatibility.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p2',
@@ -45,8 +76,7 @@ export const initialProducts: Product[] = [
     subCategory: 'Accessoires',
     price: 22500,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCK5dNu1OaRbz_q9F25Dg1PZoB14voUFCp6AZzlMXEonsgvrOGgGorj_hlA6IsVx2O1pWT9T-Hnwtv-xEbPO_ThdjXTG4i6N0gL0Sl9U5BJvzUPz6MKT852MRTmYMY4E-_y6M6uqO5hej2mPEyFo72h4S2IRLF-PuVtNUAudS2EsFUzKh00DGXWLc__QTip-cKb3-4fHA1OjI6a3dPdmY2J-xp4IEtjSkWPkWq1atK4UKZUFD1vr6Jk',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCK5dNu1OaRbz_q9F25Dg1PZoB14voUFCp6AZzlMXEonsgvrOGgGorj_hlA6IsVx2O1pWT9T-Hnwtv-xEbPO_ThdjXTG4i6N0gL0Sl9U5BJvzUPz6MKT852MRTmYMY4E-_y6M6uqO5hej2mPEyFo72h4S2IRLF-PuVtNUAudS2EsFUzKh00DGXWLc__QTip-cKb3-4fHA1OjI6a3dPdmY2J-xp4IEtjSkWPkWq1atK4UKZUFD1vr6Jk',
     rating: 4.7,
     reviewsCount: 94,
     stock: 18,
@@ -54,10 +84,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Noir Mat',
-    description:
-      'Prise en main ergonomique 57° prévenant la fatigue du poignet, capteur optique haute précision 16 000 DPI et boutons programmables.',
-    descriptionEn:
-      'Ergonomic 57° vertical grip reducing wrist strain, 16,000 DPI high-precision optical sensor and programmable buttons.'
+    description: 'Prise en main ergonomique 57° prévenant la fatigue du poignet, capteur optique haute précision 16 000 DPI et boutons programmables.',
+    descriptionEn: 'Ergonomic 57° vertical grip reducing wrist strain, 16,000 DPI high-precision optical sensor and programmable buttons.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p3',
@@ -68,8 +99,7 @@ export const initialProducts: Product[] = [
     subCategory: 'Audio & Son',
     price: 115000,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCpPq4LD9UlbmDefUE_1_i51MqRc-En5xjwE486lL0dOLC4fwdukqcgLpuxdKt8oJe1wt5DGXlhGC_hMgvuKldU7cbmTeke2DIkxsQBcrm7nNLvKUYHTgyUuwmqoEtAXJaarLRFGbCPD_0ZfyZiQ804jb6umOalj2cYAo3K8ZpaB6S_qeWmwFIfZgAFM3fg40etRYAqIpULC63HIlTvzQNmDR5x5Tmw2SIFDcq-XHtSzkcmSV5W9KTd',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCpPq4LD9UlbmDefUE_1_i51MqRc-En5xjwE486lL0dOLC4fwdukqcgLpuxdKt8oJe1wt5DGXlhGC_hMgvuKldU7cbmTeke2DIkxsQBcrm7nNLvKUYHTgyUuwmqoEtAXJaarLRFGbCPD_0ZfyZiQ804jb6umOalj2cYAo3K8ZpaB6S_qeWmwFIfZgAFM3fg40etRYAqIpULC63HIlTvzQNmDR5x5Tmw2SIFDcq-XHtSzkcmSV5W9KTd',
     rating: 5.0,
     reviewsCount: 63,
     stock: 4,
@@ -77,10 +107,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Argent & Gris',
-    description:
-      'Réduction active du bruit adaptative, transducteurs 40 mm en néodyme, 40 heures d autonomie et coussinets à mémoire de forme.',
-    descriptionEn:
-      'Adaptive active noise cancellation, 40mm neodymium drivers, 40-hour battery life and memory foam ear cushions.'
+    description: 'Réduction active du bruit adaptative, transducteurs 40 mm en néodyme, 40 heures d autonomie et coussinets à mémoire de forme.',
+    descriptionEn: 'Adaptive active noise cancellation, 40mm neodymium drivers, 40-hour battery life and memory foam ear cushions.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p4',
@@ -92,8 +123,7 @@ export const initialProducts: Product[] = [
     price: 34000,
     originalPrice: 38000,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA7VAmfY5Gx72LdCVCos2PMNlzUZdDW2FzxCz5dEoWBYOXEai9BxNNv3DDI-XZKOllhvO7IF_Pkpx3UP9ZQAoVVjxYSI4xLwBlRJvlSnL1Au29mXtrH0R8DoEnf5gx9SgJJhvSLCNvqPPqc88yRoHrbxNet-H8xtFPsBOusdOmssr9qklWp99lsOP6vKy1KiggJ7USpYbDyD63ImYz8R35LKzo2siqCMMwGrgtKJOM_9TOtIS0ZhY3K',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7VAmfY5Gx72LdCVCos2PMNlzUZdDW2FzxCz5dEoWBYOXEai9BxNNv3DDI-XZKOllhvO7IF_Pkpx3UP9ZQAoVVjxYSI4xLwBlRJvlSnL1Au29mXtrH0R8DoEnf5gx9SgJJhvSLCNvqPPqc88yRoHrbxNet-H8xtFPsBOusdOmssr9qklWp99lsOP6vKy1KiggJ7USpYbDyD63ImYz8R35LKzo2siqCMMwGrgtKJOM_9TOtIS0ZhY3K',
     rating: 4.8,
     reviewsCount: 71,
     stock: 29,
@@ -101,10 +131,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Noir Carbone',
-    description:
-      'Gâchettes à effet Hall ultra précises sans drift, connectivité Bluetooth 5.2 et 2.4 GHz pour PC, Switch, Android et iOS.',
-    descriptionEn:
-      'Precision Hall-effect anti-drift triggers, dual 2.4GHz and Bluetooth 5.2 connectivity for PC, Switch, iOS & Android.'
+    description: 'Gâchettes à effet Hall ultra précises sans drift, connectivité Bluetooth 5.2 et 2.4 GHz pour PC, Switch, Android et iOS.',
+    descriptionEn: 'Precision Hall-effect anti-drift triggers, dual 2.4GHz and Bluetooth 5.2 connectivity for PC, Switch, iOS & Android.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p5',
@@ -115,8 +146,7 @@ export const initialProducts: Product[] = [
     subCategory: 'Connectique',
     price: 14500,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDLfdOz5_8_DpVWQ150obHoTF8pFERobJzZcSs5Fycm8qF8u_Lylwccz3Vx-WWcfWxwVMrxKsVKgLePLsmXjKl_QY2Ajm-o9sEcneEs_hePZiW_RMQ4XKA1INgQik2J8mFfF4o9MRoo_1xxXckW9EfrtUjRuqOZDJCYn4poo1RjRMd8sj1t1X60ajpsUmaC06fCCxzo9d0f-H3Yq0B9Vr0EdbXu60R4grUPvyo7FnpH-qher8PBphtR',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDLfdOz5_8_DpVWQ150obHoTF8pFERobJzZcSs5Fycm8qF8u_Lylwccz3Vx-WWcfWxwVMrxKsVKgLePLsmXjKl_QY2Ajm-o9sEcneEs_hePZiW_RMQ4XKA1INgQik2J8mFfF4o9MRoo_1xxXckW9EfrtUjRuqOZDJCYn4poo1RjRMd8sj1t1X60ajpsUmaC06fCCxzo9d0f-H3Yq0B9Vr0EdbXu60R4grUPvyo7FnpH-qher8PBphtR',
     rating: 4.9,
     reviewsCount: 42,
     stock: 53,
@@ -124,10 +154,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Teal Pétrole',
-    description:
-      'Gaine tressée Paracord double couche, connecteur aviateur métallique détachable GX12 et charge rapide jusqu à 60W.',
-    descriptionEn:
-      'Double-sleeved braided paracord, detachable metallic GX12 aviator connector, fast charging up to 60W.'
+    description: 'Gaine tressée Paracord double couche, connecteur aviateur métallique détachable GX12 et charge rapide jusqu à 60W.',
+    descriptionEn: 'Double-sleeved braided paracord, detachable metallic GX12 aviator connector, fast charging up to 60W.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p6',
@@ -138,8 +169,7 @@ export const initialProducts: Product[] = [
     subCategory: 'Bureautique',
     price: 19000,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCsPOuR-MEfLx-K_Iu6YJpVvPvtKql7EkkQNMmh9KIweFx9MZ2hY3lEX0CO_6fpRjmehlXQGwtjIoHIAB1haRsCsx4P5sSrbiyZ001zx1y_QKEA-oWASBVePiUWOIFEcFCC32MVTIWqXp1OBkcwCs_x2Ojyf72vfTk1p7nvbgamIiU4QEQRyGaiVoHq7GQv27m5zCxjBpl5cm3qlAYyOoosN1Txwc7QJ_bpwhK8I6YChYJYyQZhReHo',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCsPOuR-MEfLx-K_Iu6YJpVvPvtKql7EkkQNMmh9KIweFx9MZ2hY3lEX0CO_6fpRjmehlXQGwtjIoHIAB1haRsCsx4P5sSrbiyZ001zx1y_QKEA-oWASBVePiUWOIFEcFCC32MVTIWqXp1OBkcwCs_x2Ojyf72vfTk1p7nvbgamIiU4QEQRyGaiVoHq7GQv27m5zCxjBpl5cm3qlAYyOoosN1Txwc7QJ_bpwhK8I6YChYJYyQZhReHo',
     rating: 4.6,
     reviewsCount: 19,
     stock: 8,
@@ -147,10 +177,11 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Gris Sidéral',
-    description:
-      'Aluminium aéronautique pliable avec double ventilateurs silencieux intégrés et concentrateur 4 ports USB 3.0.',
-    descriptionEn:
-      'Aero-grade foldable aluminum alloy body with ultra-quiet dual cooling fans and integrated 4-port USB 3.0 hub.'
+    description: 'Aluminium aéronautique pliable avec double ventilateurs silencieux intégrés et concentrateur 4 ports USB 3.0.',
+    descriptionEn: 'Aero-grade foldable aluminum alloy body with ultra-quiet dual cooling fans and integrated 4-port USB 3.0 hub.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
   {
     id: 'p7',
@@ -162,8 +193,7 @@ export const initialProducts: Product[] = [
     price: 28000,
     originalPrice: 32000,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAAUkQPXxfskbmUNO1I_K8j815NBvoSXTBxB2hrVoxl0NDs-C3g2yLhW7ur6aivocGK_tyKhKPfVbDKvPMrv_0zxiISzqMaIhrElQhEz1rwY0KMusAoQKYBZNHiGSfSV8Ti-s1n3iVh9eQUi_ZffOHhXqhB_KRw4Pq3rsGbVsJCfMRwt7FFFgNIez76pHXJF-5KhfJOEepfsjl8LsrrA6aN0RHRPK9UQVZhwtDFSJ3e039hYPsl-CxW',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAAUkQPXxfskbmUNO1I_K8j815NBvoSXTBxB2hrVoxl0NDs-C3g2yLhW7ur6aivocGK_tyKhKPfVbDKvPMrv_0zxiISzqMaIhrElQhEz1rwY0KMusAoQKYBZNHiGSfSV8Ti-s1n3iVh9eQUi_ZffOHhXqhB_KRw4Pq3rsGbVsJCfMRwt7FFFgNIez76pHXJF-5KhfJOEepfsjl8LsrrA6aN0RHRPK9UQVZhwtDFSJ3e039hYPsl-CxW',
     rating: 4.9,
     reviewsCount: 58,
     stock: 2,
@@ -171,22 +201,24 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Blanc Épuré',
-    description:
-      'Technologie au Nitrure de Gallium (GaN III) compacte permettant de recharger simultanément un MacBook, un smartphone et des écouteurs.',
-    descriptionEn:
-      'Ultra-compact GaN III fast charger capable of charging laptop, phone and accessories simultaneously at peak 100W.'
+    description: 'Technologie au Nitrure de Gallium (GaN III) compacte permettant de recharger simultanément un MacBook, un smartphone et des écouteurs.',
+    descriptionEn: 'Ultra-compact GaN III fast charger capable of charging laptop, phone and accessories simultaneously at peak 100W.',
+    sellerId: 'seller1',
+    sellerName: 'Amara Touré',
+    sellerShopName: 'TechHub Abidjan'
   },
+
+  // ── SELLER 2 : Wax & Style CI ───────────────────────────────────────────
   {
     id: 'p8',
     sku: 'TX-WAX-8820',
     name: 'Pagne Wax Royal Pur Coton (6 yards)',
     nameEn: 'Royal Wax Print Fabric (6 yards)',
-    category: 'Fashion & Textile',
+    category: 'Mode & Textile',
     subCategory: 'Tissus & Mode',
     price: 48500,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDW6tO5u4zWU8RvxpR4ZvIZ94Oprt3FtIVFbYOV9Xl0S2PY3f50l9NbowW90p0C16V2AtYutT8tWNp9dfCQ3ca-q816UpjN-77HBDg2LWNPgv0UeXMKU_JZvccP7VdS0RLqxBvXkcW7T2336Mw3IrtycZ85pG_P0AEyLZRBxv-tYTo_w0pjJsEYytmYN_Z48fJajftgXTfUY6u4RYIOXeMjcpScXisPkwAps66G0UuGw96f102tKlSE',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDW6tO5u4zWU8RvxpR4ZvIZ94Oprt3FtIVFbYOV9Xl0S2PY3f50l9NbowW90p0C16V2AtYutT8tWNp9dfCQ3ca-q816UpjN-77HBDg2LWNPgv0UeXMKU_JZvccP7VdS0RLqxBvXkcW7T2336Mw3IrtycZ85pG_P0AEyLZRBxv-tYTo_w0pjJsEYytmYN_Z48fJajftgXTfUY6u4RYIOXeMjcpScXisPkwAps66G0UuGw96f102tKlSE',
     rating: 5.0,
     reviewsCount: 142,
     stock: 25,
@@ -194,22 +226,71 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Bleu Indigo & Or',
-    description:
-      'Tissu pagne wax hollandais véritable 100% coton peigné aux teintes chatoyantes et motifs traditionnels stylisés.',
-    descriptionEn:
-      'Authentic 100% premium combed cotton African wax print fabric with vibrant indigo floral patterns.'
+    description: 'Tissu pagne wax hollandais véritable 100% coton peigné aux teintes chatoyantes et motifs traditionnels stylisés.',
+    descriptionEn: 'Authentic 100% premium combed cotton African wax print fabric with vibrant indigo floral patterns.',
+    sellerId: 'seller2',
+    sellerName: 'Fatou Diallo',
+    sellerShopName: 'Wax & Style CI'
   },
+  {
+    id: 'p10',
+    sku: 'TX-BZN-4401',
+    name: 'Bazin Riche Brodé Homme (5 yards)',
+    nameEn: 'Embroidered Bazin Riche Men Fabric (5 yards)',
+    category: 'Mode & Textile',
+    subCategory: 'Tissus & Mode',
+    price: 62000,
+    originalPrice: 70000,
+    currency: 'XOF',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDW6tO5u4zWU8RvxpR4ZvIZ94Oprt3FtIVFbYOV9Xl0S2PY3f50l9NbowW90p0C16V2AtYutT8tWNp9dfCQ3ca-q816UpjN-77HBDg2LWNPgv0UeXMKU_JZvccP7VdS0RLqxBvXkcW7T2336Mw3IrtycZ85pG_P0AEyLZRBxv-tYTo_w0pjJsEYytmYN_Z48fJajftgXTfUY6u4RYIOXeMjcpScXisPkwAps66G0UuGw96f102tKlSE',
+    rating: 4.8,
+    reviewsCount: 87,
+    stock: 12,
+    maxStock: 30,
+    status: 'online',
+    visibility: true,
+    color: 'Blanc & Or',
+    description: 'Bazin riche brodé de qualité supérieure, idéal pour boubou et tenue de cérémonie. Motifs géométriques dorés à l\'aiguille.',
+    descriptionEn: 'Premium embroidered bazin riche fabric, perfect for boubou and ceremony wear. Golden geometric needle patterns.',
+    sellerId: 'seller2',
+    sellerName: 'Fatou Diallo',
+    sellerShopName: 'Wax & Style CI'
+  },
+  {
+    id: 'p11',
+    sku: 'TX-KIT-7703',
+    name: 'Ensemble Tenue Traditionnelle Femme',
+    nameEn: 'Traditional Women Outfit Set',
+    category: 'Mode & Textile',
+    subCategory: 'Prêt-à-Porter',
+    price: 35000,
+    currency: 'XOF',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDW6tO5u4zWU8RvxpR4ZvIZ94Oprt3FtIVFbYOV9Xl0S2PY3f50l9NbowW90p0C16V2AtYutT8tWNp9dfCQ3ca-q816UpjN-77HBDg2LWNPgv0UeXMKU_JZvccP7VdS0RLqxBvXkcW7T2336Mw3IrtycZ85pG_P0AEyLZRBxv-tYTo_w0pjJsEYytmYN_Z48fJajftgXTfUY6u4RYIOXeMjcpScXisPkwAps66G0UuGw96f102tKlSE',
+    rating: 4.9,
+    reviewsCount: 55,
+    stock: 7,
+    maxStock: 20,
+    status: 'online',
+    visibility: true,
+    color: 'Violet & Doré',
+    description: 'Ensemble complet (haut + jupe) en wax imprimé 100% coton, couture artisanale ivoirienne. Tailles S à XL.',
+    descriptionEn: 'Complete set (top + skirt) in 100% cotton wax print, Ivorian artisanal tailoring. Sizes S to XL.',
+    sellerId: 'seller2',
+    sellerName: 'Fatou Diallo',
+    sellerShopName: 'Wax & Style CI'
+  },
+
+  // ── SELLER 3 : Nature & Bio Market ─────────────────────────────────────
   {
     id: 'p9',
     sku: 'CS-KRT-500G',
     name: 'Beurre de Karité Bio Artisanal 500g',
     nameEn: 'Organic Shea Butter Pure 500g',
-    category: 'Foods & Agro',
+    category: 'Bio & Cosmétique',
     subCategory: 'Cosmétique Naturel',
     price: 12900,
     currency: 'XOF',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCK_G_yfq5t8Y_DlKcu14NXclIbg-APOS72XZXiDDQCNiZ2KuAsix8R5XpO_g-n50y9fTSFlKlVbz-2RkGF7yOyFwMEKWIJg5V_xfsROcg-NJv7Dd2Xgj5_PKYach2N_JF9SErfMeKXP6wBIMiPPjJ74Xy2l2kcwrXaF9xfCWlCvyoGB04CLD5GszwUuGb3Yo1g6Jo95WxnEUFIUDcT09KsRcsl_Qm2uSi112ilbaVocNTm0R7BjQRE',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCK_G_yfq5t8Y_DlKcu14NXclIbg-APOS72XZXiDDQCNiZ2KuAsix8R5XpO_g-n50y9fTSFlKlVbz-2RkGF7yOyFwMEKWIJg5V_xfsROcg-NJv7Dd2Xgj5_PKYach2N_JF9SErfMeKXP6wBIMiPPjJ74Xy2l2kcwrXaF9xfCWlCvyoGB04CLD5GszwUuGb3Yo1g6Jo95WxnEUFIUDcT09KsRcsl_Qm2uSi112ilbaVocNTm0R7BjQRE',
     rating: 4.9,
     reviewsCount: 88,
     stock: 38,
@@ -217,10 +298,58 @@ export const initialProducts: Product[] = [
     status: 'online',
     visibility: true,
     color: 'Naturel Crème',
-    description:
-      'Beurre de karité brut non raffiné extrait à froid par les coopératives de femmes en Côte d Ivoire.',
-    descriptionEn:
-      'Pure raw unrefined shea butter cold-pressed by West African cooperatives in eco-friendly glass packaging.'
+    description: 'Beurre de karité brut non raffiné extrait à froid par les coopératives de femmes en Côte d Ivoire.',
+    descriptionEn: 'Pure raw unrefined shea butter cold-pressed by West African cooperatives in eco-friendly glass packaging.',
+    sellerId: 'seller3',
+    sellerName: 'Kofi Mensah',
+    sellerShopName: 'Nature & Bio Market'
+  },
+  {
+    id: 'p12',
+    sku: 'CS-ARG-250G',
+    name: 'Huile d\'Argan Pure Bio 100ml',
+    nameEn: 'Pure Organic Argan Oil 100ml',
+    category: 'Bio & Cosmétique',
+    subCategory: 'Huiles & Soins',
+    price: 18500,
+    originalPrice: 22000,
+    currency: 'XOF',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCK_G_yfq5t8Y_DlKcu14NXclIbg-APOS72XZXiDDQCNiZ2KuAsix8R5XpO_g-n50y9fTSFlKlVbz-2RkGF7yOyFwMEKWIJg5V_xfsROcg-NJv7Dd2Xgj5_PKYach2N_JF9SErfMeKXP6wBIMiPPjJ74Xy2l2kcwrXaF9xfCWlCvyoGB04CLD5GszwUuGb3Yo1g6Jo95WxnEUFIUDcT09KsRcsl_Qm2uSi112ilbaVocNTm0R7BjQRE',
+    rating: 4.8,
+    reviewsCount: 61,
+    stock: 22,
+    maxStock: 50,
+    status: 'online',
+    visibility: true,
+    color: 'Or Ambré',
+    description: 'Huile d\'argan certifiée biologique, première pression à froid. Visage, cheveux et corps. Sans paraben ni silicone.',
+    descriptionEn: 'Certified organic argan oil, cold first press. Face, hair and body. Paraben and silicone free.',
+    sellerId: 'seller3',
+    sellerName: 'Kofi Mensah',
+    sellerShopName: 'Nature & Bio Market'
+  },
+  {
+    id: 'p13',
+    sku: 'CS-SAV-200G',
+    name: 'Savon Noir Africain Beldi 200g',
+    nameEn: 'African Black Soap Beldi 200g',
+    category: 'Bio & Cosmétique',
+    subCategory: 'Savons Naturels',
+    price: 7500,
+    currency: 'XOF',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCK_G_yfq5t8Y_DlKcu14NXclIbg-APOS72XZXiDDQCNiZ2KuAsix8R5XpO_g-n50y9fTSFlKlVbz-2RkGF7yOyFwMEKWIJg5V_xfsROcg-NJv7Dd2Xgj5_PKYach2N_JF9SErfMeKXP6wBIMiPPjJ74Xy2l2kcwrXaF9xfCWlCvyoGB04CLD5GszwUuGb3Yo1g6Jo95WxnEUFIUDcT09KsRcsl_Qm2uSi112ilbaVocNTm0R7BjQRE',
+    rating: 4.7,
+    reviewsCount: 113,
+    stock: 0,
+    maxStock: 100,
+    status: 'online',
+    visibility: true,
+    color: 'Noir Naturel',
+    description: 'Savon noir traditionnel beldi à base d\'huile d\'olive et d\'eucalyptus. Exfoliant naturel pour peaux mixtes et grasses.',
+    descriptionEn: 'Traditional beldi black soap made with olive oil and eucalyptus. Natural exfoliant for combination and oily skin.',
+    sellerId: 'seller3',
+    sellerName: 'Kofi Mensah',
+    sellerShopName: 'Nature & Bio Market'
   }
 ];
 
@@ -282,7 +411,19 @@ export const translations = {
     visibilityHidden: 'Masqué',
     newProduct: 'Nouveau produit',
     logout: 'Déconnexion Vendeur',
-    publicMarketplace: 'Voir le catalogue Djassa Market'
+    publicMarketplace: 'Voir le catalogue Djassa Market',
+    soldBy: 'Vendu par',
+    navCatalog: 'Catalogue',
+    navSeller: 'Espace vendeur',
+    loginRequired: 'Connexion requise',
+    mainNav: 'Navigation principale',
+    openMenu: 'Ouvrir le menu',
+    closeMenu: 'Fermer le menu',
+    language: 'Langue',
+    skipToContent: 'Aller au contenu principal',
+    sellerAccount: 'Compte vendeur',
+    loadingPage: 'Chargement de la page…',
+    loadingWindow: 'Chargement…'
   },
   EN: {
     catalogTitle: 'Products Catalog',
@@ -341,6 +482,18 @@ export const translations = {
     visibilityHidden: 'Hidden',
     newProduct: 'New Product',
     logout: 'Sign Out',
-    publicMarketplace: 'View Djassa Market Catalog'
+    publicMarketplace: 'View Djassa Market Catalog',
+    soldBy: 'Sold by',
+    navCatalog: 'Catalog',
+    navSeller: 'Seller space',
+    loginRequired: 'Sign-in required',
+    mainNav: 'Main navigation',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    language: 'Language',
+    skipToContent: 'Skip to main content',
+    sellerAccount: 'Seller account',
+    loadingPage: 'Loading page…',
+    loadingWindow: 'Loading…'
   }
 };

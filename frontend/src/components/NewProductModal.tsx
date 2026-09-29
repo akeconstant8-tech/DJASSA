@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Product } from '../types';
+import { NewProductInput } from '../types';
+import { m, backdrop, modal } from '../motion';
+import { Button } from './Button';
+import { SmartImage } from './SmartImage';
+import { useOverlay } from '../hooks/useOverlay';
 
 interface NewProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: Product) => void;
+  onSave: (product: NewProductInput) => void;
 }
 
 const PRESET_IMAGES = [
@@ -44,22 +48,27 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
   const [image, setImage] = useState(PRESET_IMAGES[0].url);
   const [description, setDescription] = useState('');
 
+  useOverlay(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    // Montants en entiers FCFA, stock jamais négatif.
+    const safePrice = Math.round(Number(price) || 0);
+    const safeStock = Math.max(0, Math.floor(Number(stock) || 0));
+    if (!name.trim() || safePrice < 1) return;
 
-    const prod: Product = {
+    const prod: NewProductInput = {
       id: `p-${Date.now()}`,
       sku,
       name: name.trim(),
       nameEn: name.trim(),
       category,
-      price: Number(price) || 0,
+      price: safePrice,
       currency: 'XOF',
-      stock: Number(stock) || 0,
-      maxStock: Number(maxStock) || 50,
+      stock: safeStock,
+      maxStock: Math.max(safeStock, Math.floor(Number(maxStock) || 50)),
       status: 'online',
       visibility: true,
       image,
@@ -74,8 +83,14 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-[#fed7aa] overflow-hidden flex flex-col max-h-[90vh]">
+    <m.div
+      variants={backdrop}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+    >
+      <m.div variants={modal} className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-[#fed7aa] overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header with black gradient & Djassa Market logo */}
         <div className="p-5 bg-gradient-dark text-white border-b border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -93,9 +108,10 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Fermer"
             className="w-8 h-8 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">close</span>
           </button>
         </div>
 
@@ -116,7 +132,7 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
                       : 'border-[#fed7aa]/60 opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img.url} alt={img.name} className="w-full h-full object-contain" />
+                  <SmartImage src={img.url} alt={img.name} wrapperClassName="w-full h-full rounded-xl" className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>
@@ -153,15 +169,19 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
                 className="p-3 rounded-2xl bg-[#fffaf5] border border-[#fed7aa] focus:outline-none font-semibold cursor-pointer"
               >
                 <option value="Electronics">Electronics</option>
-                <option value="Fashion & Textile">Fashion & Textile</option>
-                <option value="Furniture & Deco">Furniture & Deco</option>
-                <option value="Foods & Agro">Foods & Agro</option>
+                <option value="Mode & Textile">Mode & Textile</option>
+                <option value="Bio & Cosmétique">Bio & Cosmétique</option>
+                <option value="Maison & Déco">Maison & Déco</option>
               </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className="font-bold text-[#0f172a]">Prix (XOF)</label>
               <input
                 type="number"
+                required
+                min={1}
+                step={1}
+                inputMode="numeric"
                 value={price}
                 onChange={(e) => setPrice(Number(e.target.value))}
                 className="p-3 rounded-2xl bg-[#fffaf5] font-black border border-[#fed7aa] focus:outline-none text-[#ea580c]"
@@ -171,6 +191,9 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
               <label className="font-bold text-[#0f172a]">Stock Initial</label>
               <input
                 type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
                 value={stock}
                 onChange={(e) => setStock(Number(e.target.value))}
                 className="p-3 rounded-2xl bg-[#fffaf5] font-bold border border-[#fed7aa] focus:outline-none"
@@ -193,19 +216,19 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#64748b] hover:bg-[#fffaf5]"
+              className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-[#64748b] btn-motion"
             >
               Annuler
             </button>
-            <button
+            <Button
               type="submit"
-              className="px-5 py-2.5 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] text-white text-xs font-black shadow-md transition-all active:scale-95"
+              className="px-5 py-2.5 rounded-2xl bg-gradient-orange text-white text-xs font-black shadow-md hover:shadow-lg"
             >
               Publier le produit
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </m.div>
+    </m.div>
   );
 };

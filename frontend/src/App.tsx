@@ -3,17 +3,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
-import { AppView, Language, Product, CartItem, ConfirmedOrder, SellerProfile } from './types';
-import { initialProducts, defaultSellerProfile } from './data/mockData';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AppView,
+  Language,
+  Product,
+  CartItem,
+  ConfirmedOrder,
+  SellerProfile,
+  NewProductInput,
+  PaymentMethod
+} from './types';
+import { initialProducts, defaultSellerProfile, translations } from './data/mockData';
 import { Navbar } from './components/Navbar';
 import { CustomerCatalog } from './components/CustomerCatalog';
 import { CartDrawer } from './components/CartDrawer';
-import { CheckoutPage } from './components/CheckoutPage';
-import { OrderConfirmationPage } from './components/OrderConfirmationPage';
-import { SellerLoginModal } from './components/SellerLoginModal';
-import { SellerAdminStock } from './components/SellerAdminStock';
-import { NewProductModal } from './components/NewProductModal';
+import {
+  CheckoutSkeleton,
+  ConfirmationSkeleton,
+  OverlayLoader,
+  SellerAdminSkeleton
+} from './components/skeletons/PageSkeletons';
+import {
+  CheckoutPage,
+  NewProductModal,
+  OrderConfirmationPage,
+  SellerAdminStock,
+  SellerLoginModal,
+  prefetchBuyerScreensWhenIdle,
+  prefetchScreens
+} from './lazyScreens';
+import { AnimatePresence, PageTransition } from './motion';
+
+// Titre de l'onglet par page (utile aussi aux lecteurs d'écran à chaque changement de page).
+const PAGE_TITLES: Record<AppView, Record<Language, string>> = {
+  catalog: { FR: 'Catalogue', EN: 'Catalog' },
+  checkout: { FR: 'Paiement', EN: 'Checkout' },
+  confirmation: { FR: 'Commande confirmée', EN: 'Order confirmed' },
+  seller_admin: { FR: 'Espace vendeur', EN: 'Seller space' }
+};
 
 export default function App() {
   // Starts strictly on the client product catalog as requested
@@ -25,6 +53,21 @@ export default function App() {
   ]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // Moyen de paiement choisi depuis le raccourci du panier, présélectionné au checkout.
+  const [preferredPayment, setPreferredPayment] = useState<PaymentMethod | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    document.title = `${PAGE_TITLES[currentView][lang]} — Djassa Market`;
+  }, [currentView, lang]);
+
+  const t = translations[lang];
+
+  // Après une transition de page : retour en haut, et focus sur le contenu pour le clavier et les lecteurs d'écran.
+  const handlePageExitComplete = () => {
+    window.scrollTo({ top: 0 });
+    mainRef.current?.focus({ preventScroll: true });
+  };
 
   // Customer order confirmation state
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
@@ -34,28 +77,55 @@ export default function App() {
   const [isSellerLoginOpen, setIsSellerLoginOpen] = useState(false);
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
 
+  useEffect(() => {
+    prefetchBuyerScreensWhenIdle();
+  }, []);
+
+  // Préchargement sur intention : le panier ouvert mène au paiement, la connexion à l'espace vendeur.
+  useEffect(() => {
+    if (isCartOpen) prefetchScreens('checkout');
+  }, [isCartOpen]);
+  useEffect(() => {
+    if (isSellerLoginOpen) prefetchScreens('sellerAdmin', 'newProduct');
+  }, [isSellerLoginOpen]);
+
   // Cart total count
   const cartCount = cart.reduce((acc, it) => acc + it.quantity, 0);
 
+  const sellerProducts = useMemo(
+    () => products.filter((p) => p.sellerId === seller.id),
+    [products, seller.id]
+  );
+
+  // Stock actuel (et non l'instantané stocké dans le panier) : la quantité ne peut jamais le dépasser (RG-01).
+  const currentStock = (productId: string) => products.find((p) => p.id === productId)?.stock ?? 0;
+
   // Handlers for cart
-  const handleAddToCart = (product: Product) => {
+  // Renvoie false si le stock disponible est déjà entièrement dans le panier.
+  const handleAddToCart = (product: Product): boolean => {
+    const stock = currentStock(product.id);
+    const inCart = cart.find((i) => i.product.id === product.id)?.quantity ?? 0;
+    if (inCart >= stock) return false;
+
     setCart((prev) => {
       const exists = prev.find((i) => i.product.id === product.id);
       if (exists) {
         return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.product.id === product.id ? { ...i, quantity: Math.min(i.quantity + 1, stock) } : i
         );
       }
       return [...prev, { product, quantity: 1 }];
     });
+    return true;
   };
 
   const handleUpdateCartQty = (productId: string, delta: number) => {
+    const stock = currentStock(productId);
     setCart((prev) =>
       prev
         .map((i) => {
           if (i.product.id === productId) {
-            const nextQty = i.quantity + delta;
+            const nextQty = Math.min(i.quantity + delta, stock);
             return nextQty > 0 ? { ...i, quantity: nextQty } : null;
           }
           return i;
@@ -69,7 +139,8 @@ export default function App() {
   };
 
   // Checkout flow
-  const handleProceedToCheckout = () => {
+  const handleProceedToCheckout = (method?: PaymentMethod) => {
+    setPreferredPayment(method ?? null);
     setCurrentView('checkout');
   };
 
@@ -90,19 +161,33 @@ export default function App() {
   };
 
   // Seller Admin Stock Handlers
+  const isOwnedBySeller = (p: Product) => seller.isAuthenticated && p.sellerId === seller.id;
+
   const handleUpdateProductStock = (productId: string, newStock: number) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p))
+      prev.map((p) =>
+        p.id === productId && isOwnedBySeller(p) ? { ...p, stock: newStock } : p
+      )
     );
   };
 
   const handleToggleProductVisibility = (productId: string) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, visibility: !p.visibility } : p))
+      prev.map((p) =>
+        p.id === productId && isOwnedBySeller(p) ? { ...p, visibility: !p.visibility } : p
+      )
     );
   };
 
-  const handleSaveNewProduct = (newProduct: Product) => {
+  // Le vendeur est déduit de la session, jamais du formulaire.
+  const handleSaveNewProduct = (input: NewProductInput) => {
+    if (!seller.isAuthenticated) return;
+    const newProduct: Product = {
+      ...input,
+      sellerId: seller.id,
+      sellerName: seller.name,
+      sellerShopName: seller.shopName
+    };
     setProducts((prev) => [newProduct, ...prev]);
   };
 
@@ -112,12 +197,20 @@ export default function App() {
   };
 
   const handleSellerLogout = () => {
-    setSeller({ ...seller, isAuthenticated: false });
+    setSeller(defaultSellerProfile);
     setCurrentView('catalog');
   };
 
   return (
     <div className="min-h-screen bg-[#fffaf5] text-[#0f172a] flex flex-col font-sans selection:bg-[#ffedd5] selection:text-[#ea580c]">
+      {/* Lien d'évitement : premier élément atteint au clavier, visible seulement au focus */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-4 focus:py-2.5 focus:rounded-xl focus:bg-[#0f172a] focus:text-white focus:text-xs focus:font-bold focus:shadow-xl focus:outline-2 focus:outline-offset-2 focus:outline-[#ea580c]"
+      >
+        {translations[lang].skipToContent}
+      </a>
+
       {/* Top Navbar with Orange Accents & Language Toggle */}
       <Navbar
         currentView={currentView}
@@ -134,74 +227,116 @@ export default function App() {
       />
 
       {/* Main View Router */}
-      <main className="flex-1 w-full pb-16">
-        {/* 1. Public Customer Catalog (Landing View) */}
-        {currentView === 'catalog' && (
-          <CustomerCatalog
-            products={products}
-            onAddToCart={handleAddToCart}
-            lang={lang}
-            globalSearch={searchQuery}
-          />
-        )}
+      <main
+        id="main-content"
+        ref={mainRef}
+        tabIndex={-1}
+        className="flex-1 w-full pb-16 overflow-x-clip focus:outline-none"
+      >
+        {/* La page sortante s'efface avant l'entrée de la suivante. */}
+        <AnimatePresence mode="wait" onExitComplete={handlePageExitComplete}>
+          {/* 1. Public Customer Catalog (Landing View) */}
+          {currentView === 'catalog' && (
+            <PageTransition key="catalog">
+              <CustomerCatalog
+                products={products}
+                onAddToCart={handleAddToCart}
+                lang={lang}
+                globalSearch={searchQuery}
+              />
+            </PageTransition>
+          )}
 
-        {/* 2. Customer Checkout & Payment Page */}
-        {currentView === 'checkout' && (
-          <CheckoutPage
-            cartItems={cart}
-            lang={lang}
-            onBackToCatalog={() => setCurrentView('catalog')}
-            onOrderConfirmed={handleOrderConfirmed}
-          />
-        )}
+          {/* 2. Customer Checkout & Payment Page */}
+          {currentView === 'checkout' && (
+            <PageTransition key="checkout">
+              <Suspense fallback={<CheckoutSkeleton label={t.loadingPage} />}>
+                <CheckoutPage
+                  cartItems={cart}
+                  lang={lang}
+                  initialPaymentMethod={preferredPayment}
+                  onBackToCatalog={() => setCurrentView('catalog')}
+                  onOrderConfirmed={handleOrderConfirmed}
+                />
+              </Suspense>
+            </PageTransition>
+          )}
 
-        {/* 3. Order Confirmation Screen */}
-        {currentView === 'confirmation' && confirmedOrder && (
-          <OrderConfirmationPage
-            order={confirmedOrder}
-            lang={lang}
-            onBackToCatalog={() => setCurrentView('catalog')}
-          />
-        )}
+          {/* 3. Order Confirmation Screen */}
+          {currentView === 'confirmation' && confirmedOrder && (
+            <PageTransition key="confirmation">
+              <Suspense fallback={<ConfirmationSkeleton label={t.loadingPage} />}>
+                <OrderConfirmationPage
+                  order={confirmedOrder}
+                  lang={lang}
+                  onBackToCatalog={() => setCurrentView('catalog')}
+                />
+              </Suspense>
+            </PageTransition>
+          )}
 
-        {/* 4. Seller Admin Stock Management Console */}
-        {currentView === 'seller_admin' && (
-          <SellerAdminStock
-            products={products}
-            onUpdateProductStock={handleUpdateProductStock}
-            onToggleProductVisibility={handleToggleProductVisibility}
-            onOpenNewProduct={() => setIsNewProductModalOpen(true)}
-            onBackToMarketplace={() => setCurrentView('catalog')}
-            seller={seller}
-            lang={lang}
-          />
-        )}
+          {/* 4. Seller Admin Stock Management Console */}
+          {currentView === 'seller_admin' && seller.isAuthenticated && (
+            <PageTransition key="seller_admin">
+              <Suspense fallback={<SellerAdminSkeleton label={t.loadingPage} />}>
+                <SellerAdminStock
+                  products={sellerProducts}
+                  onUpdateProductStock={handleUpdateProductStock}
+                  onToggleProductVisibility={handleToggleProductVisibility}
+                  onOpenNewProduct={() => setIsNewProductModalOpen(true)}
+                  onBackToMarketplace={() => setCurrentView('catalog')}
+                  seller={seller}
+                  lang={lang}
+                />
+              </Suspense>
+            </PageTransition>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* Shopping Cart Drawer */}
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cartItems={cart}
-        onUpdateQuantity={handleUpdateCartQty}
-        onRemoveItem={handleRemoveFromCart}
-        onProceedToCheckout={handleProceedToCheckout}
-        lang={lang}
-      />
+      {/* Overlays montés sous AnimatePresence pour jouer leur animation de sortie */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <CartDrawer
+            key="cart-drawer"
+            isOpen={isCartOpen}
+            onClose={() => setIsCartOpen(false)}
+            cartItems={cart}
+            getStock={currentStock}
+            onUpdateQuantity={handleUpdateCartQty}
+            onRemoveItem={handleRemoveFromCart}
+            onProceedToCheckout={handleProceedToCheckout}
+            lang={lang}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Seller Authentication Modal */}
-      <SellerLoginModal
-        isOpen={isSellerLoginOpen}
-        onClose={() => setIsSellerLoginOpen(false)}
-        onLoginSuccess={handleSellerLoginSuccess}
-      />
+      {/* Fenêtres chargées à la demande : indicateur discret le temps du premier téléchargement */}
+      <Suspense fallback={<OverlayLoader label={t.loadingWindow} />}>
+        <AnimatePresence>
+          {isSellerLoginOpen && (
+            <SellerLoginModal
+              key="seller-login"
+              isOpen={isSellerLoginOpen}
+              onClose={() => setIsSellerLoginOpen(false)}
+              onLoginSuccess={handleSellerLoginSuccess}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
-      {/* New Product Creation Modal */}
-      <NewProductModal
-        isOpen={isNewProductModalOpen}
-        onClose={() => setIsNewProductModalOpen(false)}
-        onSave={handleSaveNewProduct}
-      />
+      <Suspense fallback={<OverlayLoader label={t.loadingWindow} />}>
+        <AnimatePresence>
+          {isNewProductModalOpen && (
+            <NewProductModal
+              key="new-product"
+              isOpen={isNewProductModalOpen}
+              onClose={() => setIsNewProductModalOpen(false)}
+              onSave={handleSaveNewProduct}
+            />
+          )}
+        </AnimatePresence>
+      </Suspense>
     </div>
   );
 }

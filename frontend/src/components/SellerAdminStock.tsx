@@ -1,6 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product, Language, SellerProfile } from '../types';
 import { DJASSA_LOGO, translations } from '../data/mockData';
+import {
+  AnimatePresence,
+  m,
+  Reveal,
+  Stagger,
+  StaggerItem,
+  fadeIn,
+  staggerContainer,
+  staggerInterval,
+  toast
+} from '../motion';
+
+import { Button } from './Button';
+import { SmartImage } from './SmartImage';
+
+const rowsVariants = staggerContainer(staggerInterval.fast, 0.2);
 
 interface SellerAdminStockProps {
   products: Product[];
@@ -65,34 +81,54 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
     });
   }, [products, filterMode, search]);
 
+  // Un seul minuteur actif : un nouveau message n'est plus effacé par le minuteur du précédent.
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const showToast = (message: string, duration: number) => {
+    clearTimeout(toastTimer.current);
+    setToastMessage(message);
+    toastTimer.current = setTimeout(() => setToastMessage(null), duration);
+  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+
   const handleStockDelta = (productId: string, current: number, delta: number) => {
     const nextVal = Math.max(0, current + delta);
     onUpdateProductStock(productId, nextVal);
-    setToastMessage(`Stock actualisé : ${nextVal} unités.`);
-    setTimeout(() => setToastMessage(null), 2500);
+    showToast(`Stock actualisé : ${nextVal} unités.`, 2500);
   };
 
   const handleReplenish = (product: Product) => {
     const nextVal = product.stock + 25;
     onUpdateProductStock(product.id, nextVal);
-    setToastMessage(`+25 unités ajoutées au stock de ${product.name}.`);
-    setTimeout(() => setToastMessage(null), 3000);
+    showToast(`+25 unités ajoutées au stock de ${product.name}.`, 3000);
   };
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 bg-[#0f172a] text-white px-4 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 animate-in fade-in duration-200 border border-[#ea580c]">
-          <div className="w-7 h-7 rounded-full bg-gradient-orange text-white flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[16px]">check</span>
-          </div>
-          <span className="text-xs font-semibold">{toastMessage}</span>
-        </div>
-      )}
+      <AnimatePresence>
+        {toastMessage && (
+          <m.div
+            key={toastMessage}
+            variants={toast}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            role="status"
+            className="fixed bottom-6 right-6 max-w-[calc(100vw-3rem)] bg-[#0f172a] text-white px-4 py-3 rounded-2xl shadow-xl z-50 flex items-center gap-3 border border-[#ea580c]"
+          >
+            <div className="w-7 h-7 rounded-full bg-gradient-orange text-white flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[16px]">check</span>
+            </div>
+            <span className="text-xs font-semibold">{toastMessage}</span>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       {/* Top Banner & Header with black gradient (dégradé noir) & official logo */}
-      <div className="bg-gradient-dark text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden">
+      <Reveal
+        variant="fadeUp"
+        className="bg-gradient-dark text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden"
+      >
         <div className="absolute -right-8 -bottom-8 w-56 h-56 bg-[#ea580c]/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex items-start sm:items-center gap-4 relative z-10">
@@ -131,30 +167,33 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 relative z-10">
-          <button
+          <Button
+            type="button"
             onClick={onBackToMarketplace}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold border border-zinc-700 transition-colors shadow-xs"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-zinc-900 text-white text-xs font-bold border border-zinc-700 shadow-xs"
           >
-            <span className="material-symbols-outlined text-[18px] text-[#f97316]">
+            <span className="material-symbols-outlined text-[18px] text-[#f97316]" aria-hidden="true">
               local_mall
             </span>
             <span>{t.publicMarketplace}</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            type="button"
             onClick={onOpenNewProduct}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] text-white text-xs font-extrabold shadow-md hover:shadow-lg transition-all active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-orange text-white text-xs font-extrabold shadow-md hover:shadow-lg"
           >
-            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">add_circle</span>
             <span>{t.newProduct}</span>
-          </button>
+          </Button>
         </div>
-      </div>
+      </Reveal>
 
       {/* 4 Minimalist Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Stagger delay={0.1} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total SKUs */}
-        <div className="bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 flex items-center justify-between">
+        <StaggerItem variant="card">
+        <div className="card-motion h-full bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 hover:border-[#ea580c]/40 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-[#64748b]">Références Actives</span>
             <div className="text-2xl font-black text-[#0f172a] mt-1">
@@ -166,9 +205,11 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
             <span className="material-symbols-outlined text-[24px]">inventory_2</span>
           </div>
         </div>
+        </StaggerItem>
 
         {/* Stock Volume */}
-        <div className="bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 flex items-center justify-between">
+        <StaggerItem variant="card">
+        <div className="card-motion h-full bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 hover:border-[#ea580c]/40 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-[#64748b]">Unités Physiques</span>
             <div className="text-2xl font-black text-[#0f172a] mt-1">
@@ -180,9 +221,11 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
             <span className="material-symbols-outlined text-[24px]">shelves</span>
           </div>
         </div>
+        </StaggerItem>
 
         {/* Stock Value in XOF */}
-        <div className="bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 flex items-center justify-between">
+        <StaggerItem variant="card">
+        <div className="card-motion h-full bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 hover:border-[#ea580c]/40 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-[#64748b]">Valeur Marchande</span>
             <div className="text-xl font-black text-[#0f172a] mt-1">
@@ -194,9 +237,11 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
             <span className="material-symbols-outlined text-[24px]">account_balance_wallet</span>
           </div>
         </div>
+        </StaggerItem>
 
         {/* Low Stock Alerts */}
-        <div className="bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 flex items-center justify-between">
+        <StaggerItem variant="card">
+        <div className="card-motion h-full bg-white p-5 rounded-3xl shadow-xs border border-[#fed7aa]/60 hover:border-[#ea580c]/40 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-[#64748b]">Alertes Stock Bas</span>
             <div className="text-2xl font-black text-[#ea580c] mt-1">
@@ -211,7 +256,8 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
             <span className="material-symbols-outlined text-[24px]">notification_important</span>
           </div>
         </div>
-      </div>
+        </StaggerItem>
+      </Stagger>
 
       {/* Control Console: Search & Filter Tabs */}
       <div className="bg-white rounded-3xl p-4 shadow-xs border border-[#fed7aa]/60 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -241,7 +287,7 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
             <button
               key={tab.id}
               onClick={() => setFilterMode(tab.id as any)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap btn-motion ${
                 filterMode === tab.id
                   ? 'bg-gradient-orange text-white shadow-xs'
                   : 'bg-[#fffaf5] text-[#64748b] hover:text-[#0f172a] border border-[#fed7aa]/60'
@@ -267,21 +313,41 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
                 <th className="py-3.5 pr-5 text-right">Action Rapide</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#fed7aa]/40">
+            <m.tbody
+              variants={rowsVariants}
+              initial="hidden"
+              animate="visible"
+              className="divide-y divide-[#fed7aa]/40"
+            >
+              {filteredProducts.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-12 px-5 text-center text-[#64748b]">
+                    <span className="material-symbols-outlined text-[32px] text-[#ea580c] block mb-2" aria-hidden="true">
+                      inventory_2
+                    </span>
+                    <span className="text-xs font-semibold">
+                      {products.length === 0
+                        ? `Aucun produit dans ${seller.shopName} pour le moment. Cliquez sur « ${t.newProduct} » pour commencer.`
+                        : 'Aucun produit ne correspond à ce filtre.'}
+                    </span>
+                  </td>
+                </tr>
+              )}
               {filteredProducts.map((p) => {
                 const stockPercent = Math.min(100, Math.round((p.stock / p.maxStock) * 100));
                 const isLow = p.stock > 0 && p.stock < 10;
                 const isZero = p.stock <= 0;
 
                 return (
-                  <tr key={p.id} className="hover:bg-[#fffaf5]/70 transition-colors">
+                  <m.tr key={p.id} variants={fadeIn} className="hover:bg-[#fffaf5]/70 transition-colors">
                     {/* Item */}
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-3">
-                        <img
+                        <SmartImage
                           src={p.image}
                           alt={p.name}
-                          className="w-12 h-12 object-contain rounded-xl bg-[#fffaf5] p-1 border border-[#fed7aa]/50 shrink-0"
+                          wrapperClassName="w-12 h-12 rounded-xl bg-[#fffaf5] border border-[#fed7aa]/50 shrink-0"
+                          className="w-full h-full object-contain p-1"
                         />
                         <div className="min-w-0">
                           <span className="font-extrabold text-[#0f172a] block text-xs truncate max-w-xs">
@@ -350,8 +416,12 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
                         <input
                           type="number"
                           value={p.stock}
+                          min={0}
+                          step={1}
+                          inputMode="numeric"
+                          aria-label={`Stock de ${p.name}`}
                           onChange={(e) =>
-                            onUpdateProductStock(p.id, Math.max(0, Number(e.target.value) || 0))
+                            onUpdateProductStock(p.id, Math.max(0, Math.floor(Number(e.target.value) || 0)))
                           }
                           className="w-12 text-center text-xs font-black text-[#0f172a] bg-transparent focus:outline-none"
                         />
@@ -388,7 +458,7 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
                     <td className="py-4 pr-5 text-right whitespace-nowrap">
                       <button
                         onClick={() => handleReplenish(p)}
-                        className="px-3 py-1.5 rounded-xl bg-[#fff7ed] hover:bg-[#ffedd5] text-[#c2410c] text-xs font-bold border border-[#fed7aa] transition-colors inline-flex items-center gap-1 shadow-xs"
+                        className="px-3 py-1.5 rounded-xl bg-[#fff7ed] hover:bg-[#ffedd5] text-[#c2410c] text-xs font-bold border border-[#fed7aa] btn-motion inline-flex items-center gap-1 shadow-xs"
                       >
                         <span className="material-symbols-outlined text-[15px]">
                           add
@@ -396,10 +466,10 @@ export const SellerAdminStock: React.FC<SellerAdminStockProps> = ({
                         <span>+25 unités</span>
                       </button>
                     </td>
-                  </tr>
+                  </m.tr>
                 );
               })}
-            </tbody>
+            </m.tbody>
           </table>
         </div>
       </div>

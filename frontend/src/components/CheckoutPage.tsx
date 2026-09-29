@@ -1,6 +1,28 @@
 import React, { useState } from 'react';
 import { CartItem, CustomerOrderInfo, ConfirmedOrder, Language } from '../types';
 import { DJASSA_LOGO, translations } from '../data/mockData';
+import { groupCartBySeller } from '../utils/groupCartBySeller';
+import { Button } from './Button';
+import { SmartImage } from './SmartImage';
+
+// Cartes de paiement : cascade en opacité seule (l'élévation au survol est gérée en CSS).
+const paymentGridVariants = staggerContainer(staggerInterval.base, 0.15);
+// Récapitulatif : les groupes de boutiques apparaissent après la colonne.
+const summaryVariants = staggerContainer(staggerInterval.base, 0.3);
+import {
+  AnimatePresence,
+  m,
+  Reveal,
+  Stagger,
+  StaggerItem,
+  backdrop,
+  fadeIn,
+  fadeUp,
+  modal,
+  slideLeft,
+  staggerContainer,
+  staggerInterval
+} from '../motion';
 
 interface CheckoutPageProps {
   cartItems: CartItem[];
@@ -51,6 +73,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   );
   const deliveryFee = subtotal >= 50000 || subtotal === 0 ? 0 : 2500;
   const total = subtotal + deliveryFee;
+  const sellerGroups = groupCartBySeller(cartItems);
 
   const getPaymentMethodLabel = () => {
     switch (paymentMethod) {
@@ -142,7 +165,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       </div>
 
       {/* Header */}
-      <div className="mb-8">
+      <Reveal variant="fadeUp" className="mb-8">
         <div className="flex items-center gap-2.5 mb-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#ea580c] animate-pulse" />
           <span className="text-xs font-black tracking-wider uppercase text-[#ea580c]">
@@ -155,14 +178,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
         <p className="text-xs sm:text-sm text-[#64748b] mt-1 max-w-2xl">
           Sélectionnez votre moyen de paiement préféré pour valider votre commande en toute sécurité (Devise officielle : XOF).
         </p>
-      </div>
+      </Reveal>
 
       <form onSubmit={handlePay} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: 1. Payment Methods (Prominent First) & 2. Delivery Address (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
+        <Stagger
+          interval={staggerInterval.slow}
+          delay={0.08}
+          className="lg:col-span-7 flex flex-col gap-6"
+        >
 
           {/* SECTION 1 : MODE DE PAIEMENT SÉCURISÉ */}
-          <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#fed7aa] flex flex-col gap-5">
+          <StaggerItem className="bg-white rounded-3xl p-6 shadow-xs border border-[#fed7aa] flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-[#fed7aa]/60 pb-3.5">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-2xl bg-gradient-orange text-white flex items-center justify-center shadow-xs">
@@ -183,11 +210,11 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </div>
 
             {/* 4 Branded Payment Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <m.div variants={paymentGridVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {/* Option 1: Orange Money */}
-              <div
-                onClick={() => setPaymentMethod('orange_money')}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              <m.label
+                variants={fadeIn}
+                className={`p-4 rounded-2xl border-2 card-interactive flex flex-col justify-between gap-3 ${
                   paymentMethod === 'orange_money'
                     ? 'border-[#ff6600] bg-[#fff7ed] shadow-sm ring-2 ring-[#ff6600]/20'
                     : 'border-[#fed7aa]/70 bg-[#fffaf5] hover:bg-white hover:border-[#ff6600]/50'
@@ -213,18 +240,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     name="paymentProvider"
                     checked={paymentMethod === 'orange_money'}
                     onChange={() => setPaymentMethod('orange_money')}
-                    className="accent-[#ff6600] w-4 h-4 cursor-pointer"
+                    className="accent-[#ff6600] w-4 h-4 cursor-pointer focus-visible:outline-none"
                   />
                 </div>
                 <div className="text-[10px] text-[#c2410c] font-semibold bg-[#ffedd5] px-2.5 py-1 rounded-xl">
                   Validation USSD #144*82# ou App
                 </div>
-              </div>
+              </m.label>
 
               {/* Option 2: MTN Money */}
-              <div
-                onClick={() => setPaymentMethod('mtn_momo')}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              <m.label
+                variants={fadeIn}
+                className={`p-4 rounded-2xl border-2 card-interactive flex flex-col justify-between gap-3 ${
                   paymentMethod === 'mtn_momo'
                     ? 'border-[#ca8a04] bg-[#fefce8] shadow-sm ring-2 ring-[#ca8a04]/20'
                     : 'border-[#fed7aa]/70 bg-[#fffaf5] hover:bg-white hover:border-[#ca8a04]/50'
@@ -250,18 +277,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     name="paymentProvider"
                     checked={paymentMethod === 'mtn_momo'}
                     onChange={() => setPaymentMethod('mtn_momo')}
-                    className="accent-[#ca8a04] w-4 h-4 cursor-pointer"
+                    className="accent-[#ca8a04] w-4 h-4 cursor-pointer focus-visible:outline-none"
                   />
                 </div>
                 <div className="text-[10px] text-[#854d0e] font-semibold bg-[#fef08a] px-2.5 py-1 rounded-xl">
                   Notification Push automatique
                 </div>
-              </div>
+              </m.label>
 
               {/* Option 3: Wave */}
-              <div
-                onClick={() => setPaymentMethod('wave')}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              <m.label
+                variants={fadeIn}
+                className={`p-4 rounded-2xl border-2 card-interactive flex flex-col justify-between gap-3 ${
                   paymentMethod === 'wave'
                     ? 'border-[#0284c7] bg-[#f0f9ff] shadow-sm ring-2 ring-[#0284c7]/20'
                     : 'border-[#fed7aa]/70 bg-[#fffaf5] hover:bg-white hover:border-[#0284c7]/50'
@@ -287,18 +314,18 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     name="paymentProvider"
                     checked={paymentMethod === 'wave'}
                     onChange={() => setPaymentMethod('wave')}
-                    className="accent-[#0284c7] w-4 h-4 cursor-pointer"
+                    className="accent-[#0284c7] w-4 h-4 cursor-pointer focus-visible:outline-none"
                   />
                 </div>
                 <div className="text-[10px] text-[#0369a1] font-semibold bg-[#e0f2fe] px-2.5 py-1 rounded-xl">
                   1-Clic QR Code ou App Wave
                 </div>
-              </div>
+              </m.label>
 
               {/* Option 4: Carte Bancaire */}
-              <div
-                onClick={() => setPaymentMethod('card')}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between gap-3 ${
+              <m.label
+                variants={fadeIn}
+                className={`p-4 rounded-2xl border-2 card-interactive flex flex-col justify-between gap-3 ${
                   paymentMethod === 'card'
                     ? 'border-[#0f172a] bg-[#f8fafc] shadow-sm ring-2 ring-[#0f172a]/20'
                     : 'border-[#fed7aa]/70 bg-[#fffaf5] hover:bg-white hover:border-[#0f172a]/50'
@@ -323,17 +350,24 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     name="paymentProvider"
                     checked={paymentMethod === 'card'}
                     onChange={() => setPaymentMethod('card')}
-                    className="accent-[#0f172a] w-4 h-4 cursor-pointer"
+                    className="accent-[#0f172a] w-4 h-4 cursor-pointer focus-visible:outline-none"
                   />
                 </div>
                 <div className="text-[10px] text-[#334155] font-semibold bg-[#e2e8f0] px-2.5 py-1 rounded-xl">
                   Protégé par 3D Secure
                 </div>
-              </div>
-            </div>
+              </m.label>
+            </m.div>
 
             {/* Dynamic Interactive Input Panel for Selected Provider */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-[#fffaf5] border border-[#fed7aa] flex flex-col gap-3.5 animate-in fade-in duration-200">
+            {/* key = moyen choisi : le panneau réapparaît en fondu à chaque changement */}
+            <m.div
+              key={paymentMethod ?? 'none'}
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              className="p-4 sm:p-5 rounded-2xl bg-[#fffaf5] border border-[#fed7aa] flex flex-col gap-3.5"
+            >
               {paymentMethod === 'orange_money' && (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-2 text-xs font-extrabold text-[#c2410c]">
@@ -487,11 +521,11 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                   </div>
                 </div>
               )}
-            </div>
-          </div>
+            </m.div>
+          </StaggerItem>
 
           {/* SECTION 2 : COORDONNÉES DE LIVRAISON */}
-          <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#fed7aa]/60 flex flex-col gap-4">
+          <StaggerItem className="bg-white rounded-3xl p-6 shadow-xs border border-[#fed7aa]/60 flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-[#fed7aa]/50 pb-3">
               <span className="material-symbols-outlined text-[#ea580c] text-[22px]">
                 local_shipping
@@ -580,37 +614,70 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 className="p-3 rounded-2xl bg-[#fffaf5] text-xs text-[#0f172a] border border-[#fed7aa]/70 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#ea580c]/30 resize-none"
               />
             </div>
-          </div>
-        </div>
+          </StaggerItem>
+        </Stagger>
 
         {/* Right Column: Order Summary & Instant Checkout CTA (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-5 sticky top-24">
+        <m.div
+          variants={slideLeft}
+          custom={0.16}
+          initial="hidden"
+          animate="visible"
+          className="lg:col-span-5 flex flex-col gap-5 sticky top-24"
+        >
           <div className="bg-white rounded-3xl p-6 shadow-xs border border-[#fed7aa] flex flex-col gap-4">
             <h3 className="text-base font-black text-[#0f172a] border-b border-[#fed7aa]/60 pb-3">
               {t.orderSummary} ({cartItems.reduce((acc, i) => acc + i.quantity, 0)})
             </h3>
 
-            {/* Items review */}
-            <div className="flex flex-col gap-3 max-h-72 overflow-y-auto pr-1">
-              {cartItems.map(({ product, quantity }) => (
-                <div key={product.id} className="flex items-center gap-3 text-xs">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-12 h-12 object-contain rounded-xl bg-[#fffaf5] p-1 border border-[#fed7aa]/40 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[#0f172a] truncate">
-                      {lang === 'FR' ? product.name : product.nameEn}
-                    </p>
-                    <p className="text-[11px] text-[#64748b]">Qté : {quantity}</p>
+            {sellerGroups.length > 1 && (
+              <p className="text-[11px] text-[#64748b] bg-[#fff7ed] border border-[#fed7aa] rounded-xl px-3 py-2">
+                Un seul paiement pour <strong className="text-[#0f172a]">{sellerGroups.length} boutiques</strong> — chaque vendeur prépare et expédie son colis.
+              </p>
+            )}
+
+            {/* Items review, grouped by seller */}
+            <m.div
+              variants={summaryVariants}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-col gap-4 max-h-80 overflow-y-auto pr-1"
+            >
+              {sellerGroups.map((group) => (
+                <m.section key={group.sellerId} variants={fadeUp} className="flex flex-col gap-2.5" aria-label={group.shopName}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1.5 font-extrabold text-[#0f172a]">
+                      <span className="material-symbols-outlined text-[16px] text-[#ea580c]" aria-hidden="true">
+                        storefront
+                      </span>
+                      {group.shopName}
+                    </span>
+                    <span className="text-[11px] font-bold text-[#64748b]">
+                      {group.subtotal.toLocaleString()} XOF
+                    </span>
                   </div>
-                  <span className="font-black text-[#0f172a]">
-                    {(product.price * quantity).toLocaleString()} XOF
-                  </span>
-                </div>
+                  {group.items.map(({ product, quantity }) => (
+                    <div key={product.id} className="flex items-center gap-3 text-xs">
+                      <SmartImage
+                        src={product.image}
+                        alt={product.name}
+                        wrapperClassName="w-12 h-12 rounded-xl bg-[#fffaf5] border border-[#fed7aa]/40 shrink-0"
+                        className="w-full h-full object-contain p-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-[#0f172a] truncate">
+                          {lang === 'FR' ? product.name : product.nameEn}
+                        </p>
+                        <p className="text-[11px] text-[#64748b]">Qté : {quantity}</p>
+                      </div>
+                      <span className="font-black text-[#0f172a]">
+                        {(product.price * quantity).toLocaleString()} XOF
+                      </span>
+                    </div>
+                  ))}
+                </m.section>
               ))}
-            </div>
+            </m.div>
 
             {/* Totals */}
             <div className="flex flex-col gap-2 pt-3 border-t border-[#fed7aa]/60 text-xs text-[#64748b]">
@@ -645,21 +712,23 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             </div>
 
             {/* Payment CTA Button */}
-            <button
+            <Button
               type="submit"
-              disabled={isProcessing || cartItems.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] text-white text-xs font-black shadow-lg hover:shadow-xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              loading={isProcessing}
+              loadingText="Paiement en cours…"
+              disabled={cartItems.length === 0}
+              className="w-full py-4 rounded-2xl bg-gradient-orange text-white text-xs font-black shadow-lg hover:shadow-xl flex flex-col items-center justify-center gap-1 cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-extrabold">
-                <span className="material-symbols-outlined text-[20px]">
+              <span className="flex items-center gap-2 text-sm font-extrabold">
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
                   lock
                 </span>
                 <span>Payer {total.toLocaleString()} XOF</span>
-              </div>
+              </span>
               <span className="text-[10px] text-white/90 font-medium">
                 via {getPaymentMethodLabel()}
               </span>
-            </button>
+            </Button>
 
             <div className="flex items-center justify-center gap-2 text-[11px] text-[#64748b]">
               <span className="material-symbols-outlined text-[16px] text-[#16a34a]">
@@ -668,55 +737,69 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               <span>Paiement chiffré SSL 256-bit garanti par Djassa Market</span>
             </div>
           </div>
-        </div>
+        </m.div>
       </form>
 
       {/* Realistic Provider Payment Processing Modal Overlay */}
-      {isProcessing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-zinc-800 flex flex-col items-center text-center gap-4">
-            {paymentMethod === 'orange_money' && (
-              <div className="w-16 h-16 rounded-2xl bg-[#ff6600] text-white flex flex-col items-center justify-center font-black shadow-lg animate-bounce">
-                <span className="text-base leading-none">OM</span>
-                <span className="text-[9px] uppercase font-bold">Orange</span>
-              </div>
-            )}
-            {paymentMethod === 'mtn_momo' && (
-              <div className="w-16 h-16 rounded-2xl bg-[#facc15] text-[#0f172a] flex flex-col items-center justify-center font-black shadow-lg animate-bounce border border-[#eab308]">
-                <span className="text-base leading-none">MTN</span>
-                <span className="text-[9px] uppercase font-bold">MoMo</span>
-              </div>
-            )}
-            {paymentMethod === 'wave' && (
-              <div className="w-16 h-16 rounded-2xl bg-[#0284c7] text-white flex flex-col items-center justify-center font-black shadow-lg animate-bounce">
-                <span className="text-2xl leading-none">🌊</span>
-                <span className="text-[9px] uppercase font-bold">Wave</span>
-              </div>
-            )}
-            {paymentMethod === 'card' && (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-dark text-white flex items-center justify-center font-black shadow-lg animate-bounce border border-zinc-700">
-                <span className="material-symbols-outlined text-[32px] text-[#ea580c]">credit_card</span>
-              </div>
-            )}
+      <AnimatePresence>
+        {isProcessing && (
+          <m.div
+            key="processing"
+            variants={backdrop}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+          >
+            <m.div
+              variants={modal}
+              role="alertdialog"
+              aria-live="assertive"
+              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-zinc-800 flex flex-col items-center text-center gap-4"
+            >
+              {paymentMethod === 'orange_money' && (
+                <div className="w-16 h-16 rounded-2xl bg-[#ff6600] text-white flex flex-col items-center justify-center font-black shadow-lg animate-bounce">
+                  <span className="text-base leading-none">OM</span>
+                  <span className="text-[9px] uppercase font-bold">Orange</span>
+                </div>
+              )}
+              {paymentMethod === 'mtn_momo' && (
+                <div className="w-16 h-16 rounded-2xl bg-[#facc15] text-[#0f172a] flex flex-col items-center justify-center font-black shadow-lg animate-bounce border border-[#eab308]">
+                  <span className="text-base leading-none">MTN</span>
+                  <span className="text-[9px] uppercase font-bold">MoMo</span>
+                </div>
+              )}
+              {paymentMethod === 'wave' && (
+                <div className="w-16 h-16 rounded-2xl bg-[#0284c7] text-white flex flex-col items-center justify-center font-black shadow-lg animate-bounce">
+                  <span className="text-2xl leading-none">🌊</span>
+                  <span className="text-[9px] uppercase font-bold">Wave</span>
+                </div>
+              )}
+              {paymentMethod === 'card' && (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-dark text-white flex items-center justify-center font-black shadow-lg animate-bounce border border-zinc-700">
+                  <span className="material-symbols-outlined text-[32px] text-[#ea580c]">credit_card</span>
+                </div>
+              )}
 
-            <div>
-              <h3 className="text-base font-black text-[#0f172a]">
-                Traitement du Paiement en Cours
-              </h3>
-              <p className="text-xs text-[#ea580c] font-bold mt-1">
-                {getPaymentMethodLabel()}
+              <div>
+                <h3 className="text-base font-black text-[#0f172a]">
+                  Traitement du Paiement en Cours
+                </h3>
+                <p className="text-xs text-[#ea580c] font-bold mt-1">
+                  {getPaymentMethodLabel()}
+                </p>
+              </div>
+
+              <p className="text-xs text-[#64748b] leading-relaxed max-w-xs bg-[#fffaf5] p-3 rounded-2xl border border-[#fed7aa]">
+                {processingStep}
               </p>
-            </div>
 
-            <p className="text-xs text-[#64748b] leading-relaxed max-w-xs bg-[#fffaf5] p-3 rounded-2xl border border-[#fed7aa]">
-              {processingStep}
-            </p>
-
-            <div className="w-8 h-8 rounded-full border-3 border-[#ea580c] border-t-transparent animate-spin" />
-            <span className="text-[11px] text-[#94a3b8]">Ne fermez pas cette page...</span>
-          </div>
-        </div>
-      )}
+              <div className="w-8 h-8 rounded-full border-3 border-[#ea580c] border-t-transparent animate-spin" />
+              <span className="text-[11px] text-[#94a3b8]">Ne fermez pas cette page...</span>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -1,6 +1,12 @@
 import React from 'react';
 import { ConfirmedOrder, Language } from '../types';
 import { DJASSA_LOGO, translations } from '../data/mockData';
+import { m, Reveal, fadeUp, pop, staggerContainer, staggerInterval } from '../motion';
+
+// Articles commandés : apparaissent en cascade juste après le bloc de détail.
+const itemsVariants = staggerContainer(staggerInterval.base, 0.5);
+import { Button } from './Button';
+import { SmartImage } from './SmartImage';
 
 interface OrderConfirmationPageProps {
   order: ConfirmedOrder;
@@ -32,9 +38,15 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
           </span>
         </div>
 
-        <div className="w-20 h-20 rounded-full bg-gradient-orange flex items-center justify-center text-white shadow-lg mb-4 animate-in zoom-in duration-300">
+        <m.div
+          variants={pop}
+          custom={0.15}
+          initial="hidden"
+          animate="visible"
+          className="w-20 h-20 rounded-full bg-gradient-orange flex items-center justify-center text-white shadow-lg mb-4"
+        >
           <span className="material-symbols-outlined text-[40px]">check</span>
-        </div>
+        </m.div>
 
         <span className="px-3 py-1 rounded-full bg-[#dcfce7] text-[#16a34a] text-xs font-black tracking-wide uppercase mb-2">
           Paiement XOF Validé
@@ -48,7 +60,11 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
         </p>
 
         {/* Tracking Reference Pill */}
-        <div className="mt-6 p-4 rounded-2xl bg-[#fffaf5] border border-[#fed7aa] w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+        <Reveal
+          variant="fadeUp"
+          delay={0.25}
+          className="mt-6 p-4 rounded-2xl bg-[#fffaf5] border border-[#fed7aa] w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-left"
+        >
           <div>
             <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider block">
               {t.trackingRef}
@@ -66,24 +82,29 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
               {order.estimatedDelivery}
             </span>
           </div>
-        </div>
+        </Reveal>
 
         {/* Order Details Card */}
-        <div className="mt-6 w-full text-left bg-[#fffaf5] p-5 rounded-2xl border border-[#fed7aa]/50 flex flex-col gap-4">
+        <Reveal
+          variant="fadeUp"
+          delay={0.35}
+          className="mt-6 w-full text-left bg-[#fffaf5] p-5 rounded-2xl border border-[#fed7aa]/50 flex flex-col gap-4"
+        >
           <div className="flex justify-between items-center border-b border-[#fed7aa]/40 pb-2 text-xs">
             <span className="font-bold text-[#0f172a]">Numéro de commande</span>
             <span className="font-mono font-bold text-[#ea580c]">#{order.id}</span>
           </div>
 
-          <div className="flex flex-col gap-2.5">
+          <m.div variants={itemsVariants} className="flex flex-col gap-2.5">
             <span className="text-xs font-bold text-[#0f172a]">Articles commandés :</span>
             {order.items.map((it) => (
-              <div key={it.product.id} className="flex items-center justify-between text-xs">
+              <m.div key={it.product.id} variants={fadeUp} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
-                  <img
+                  <SmartImage
                     src={it.product.image}
                     alt={it.product.name}
-                    className="w-10 h-10 object-contain rounded-lg bg-white p-1 border border-[#fed7aa]/40"
+                    wrapperClassName="w-10 h-10 rounded-lg bg-white border border-[#fed7aa]/40 shrink-0"
+                    className="w-full h-full object-contain p-1"
                   />
                   <div>
                     <span className="font-bold text-[#0f172a] block">
@@ -95,9 +116,9 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
                 <span className="font-bold text-[#0f172a]">
                   {(it.product.price * it.quantity).toLocaleString()} XOF
                 </span>
-              </div>
+              </m.div>
             ))}
-          </div>
+          </m.div>
 
           <div className="border-t border-[#fed7aa]/40 pt-3 flex flex-col gap-1 text-xs text-[#64748b]">
             <div className="flex justify-between">
@@ -126,28 +147,34 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
               <span className="text-[#ea580c]">{order.total.toLocaleString()} XOF</span>
             </div>
           </div>
-        </div>
+        </Reveal>
 
         {/* Action Buttons */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <button
+        <Reveal
+          variant="fadeUp"
+          delay={0.45}
+          className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto"
+        >
+          <Button
+            type="button"
             onClick={onBackToCatalog}
-            className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-orange hover:bg-gradient-to-r hover:from-[#c2410c] hover:to-[#ea580c] text-white text-xs font-black shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-orange text-white text-xs font-black shadow-md hover:shadow-lg flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-[18px]">
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
               shopping_bag
             </span>
             <span>{t.backToCatalog}</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            type="button"
             onClick={() => window.print()}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white hover:bg-[#fffaf5] text-[#0f172a] text-xs font-bold border border-[#fed7aa] shadow-xs flex items-center justify-center gap-2 transition-colors"
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white text-[#0f172a] text-xs font-bold border border-[#fed7aa] shadow-xs flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-[18px]">print</span>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">print</span>
             <span>Imprimer le reçu</span>
-          </button>
-        </div>
+          </Button>
+        </Reveal>
       </div>
     </div>
   );
